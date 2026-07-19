@@ -1,0 +1,134 @@
+[gd_scene format=3 uid="uid://cqpatfifsn3sg"]
+
+[ext_resource type="Script" uid="uid://bjxbgp7st5ob1" path="res://scripts/player.gd" id="1_sy1wy"]
+[ext_resource type="AudioStream" path="res://assets/sound_effects/laser_sound.wav" id="3_qiobg"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_ufo"]
+height = 20.0
+
+[sub_resource type="Curve" id="Curve_5phf1"]
+_data = [Vector2(0, 0.384615), 0.0, 0.0, 0, 0, Vector2(0.320988, 0.978022), 0.0, 0.0, 0, 0, Vector2(0.460905, 0.626374), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 4
+
+[sub_resource type="CurveTexture" id="CurveTexture_saytj"]
+curve = SubResource("Curve_5phf1")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_0nije"]
+particle_flag_disable_z = true
+emission_shape = 3
+emission_box_extents = Vector3(30, 1, 1)
+spread = 20.0
+initial_velocity_min = 20.0
+initial_velocity_max = 60.0
+gravity = Vector3(0, 80, 0)
+scale_min = 4.0
+scale_max = 10.0
+scale_curve = SubResource("CurveTexture_saytj")
+
+[sub_resource type="Curve" id="Curve_ul8r3"]
+_data = [Vector2(0, 0.846154), 0.0, 1.4, 0, 0, Vector2(0.604938, 0.571428), -2.52979, -2.52979, 0, 0, Vector2(1, 0.153846), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_kcgkg"]
+curve = SubResource("Curve_ul8r3")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_63td5"]
+particle_flag_disable_z = true
+initial_velocity_min = 120.0
+initial_velocity_max = 169.0
+gravity = Vector3(20, 0, 0)
+tangential_accel_min = -20.0
+tangential_accel_max = 20.0
+scale_min = 4.0
+scale_max = 8.0
+scale_curve = SubResource("CurveTexture_kcgkg")
+
+[sub_resource type="Animation" id="Animation_ung4r"]
+resource_name = "Shot"
+length = 0.2
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:scale")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.1, 0.2),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(1, 1), Vector2(0.6, 1), Vector2(1, 1)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_pwo6r"]
+_data = {
+&"Shot": SubResource("Animation_ung4r")
+}
+
+[node name="Player" type="CharacterBody2D" unique_id=171733495 groups=["player"]]
+collision_mask = 1
+motion_mode = 1
+script = ExtResource("1_sy1wy")
+
+[node name="CollisionBodyLR" type="CollisionShape2D" parent="." unique_id=1210416991]
+rotation = 1.5708
+shape = SubResource("CapsuleShape2D_ufo")
+
+[node name="MovementTrailEffect" type="GPUParticles2D" parent="." unique_id=1674674163]
+position = Vector2(0, 20)
+emitting = false
+amount = 12
+lifetime = 0.15
+one_shot = true
+process_material = SubResource("ParticleProcessMaterial_0nije")
+
+[node name="BodyLR" type="Node2D" parent="." unique_id=2035860080]
+scale = Vector2(0.72, 0.72)
+
+[node name="Shadow" type="Polygon2D" parent="BodyLR" unique_id=1269367699]
+visible = false
+z_index = -48
+position = Vector2(0, 900)
+scale = Vector2(15, 1)
+color = Color(0, 0, 0, 0.25)
+polygon = PackedVector2Array(-50, 0, 50, 0, 40, 12, -40, 12)
+
+[node name="BodyRotate" type="Node2D" parent="." unique_id=706900590]
+scale = Vector2(0.72, 0.72)
+
+[node name="BulletSpawnPoint" type="Node2D" parent="BodyRotate" unique_id=1660882887]
+position = Vector2(36.72, 0)
+
+[node name="ShootingEffect" type="GPUParticles2D" parent="BodyRotate" unique_id=36126119]
+modulate = Color(0.2, 0.7, 1, 1)
+position = Vector2(36.72, 0)
+emitting = false
+amount = 10
+lifetime = 0.12
+one_shot = true
+process_material = SubResource("ParticleProcessMaterial_63td5")
+
+[node name="BodyRotatePlayer" type="AnimationPlayer" parent="." unique_id=1039194770]
+root_node = NodePath("../BodyRotate")
+libraries/ = SubResource("AnimationLibrary_pwo6r")
+
+[node name="ShotTimer" type="Timer" parent="." unique_id=204740987]
+wait_time = 0.9
+one_shot = true
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=293085978]
+stream = ExtResource("3_qiobg")
+volume_db = -12.0
+
+[node name="ProgressBar" type="ProgressBar" parent="." unique_id=1553310526]
+z_index = 10
+offset_left = -40.0
+offset_top = -80.0
+offset_right = 40.0
+offset_bottom = -68.0
+
+[node name="ShockWaveTimer" type="Timer" parent="."]
+wait_time = 5.0
+one_shot = true
+
+[connection signal="timeout" from="ShotTimer" to="." method="_on_shot_timer_timeout"]
+[connection signal="timeout" from="ShockWaveTimer" to="." method="_on_shock_wave_timer_timeout"]

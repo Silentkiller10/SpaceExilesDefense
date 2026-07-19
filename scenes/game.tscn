@@ -1,0 +1,33 @@
+[gd_scene format=3 uid="uid://bduw5gb057ino"]
+
+[ext_resource type="Script" uid="uid://jnhbyv56tj5y" path="res://scripts/game.gd" id="1_game"]
+[ext_resource type="PackedScene" uid="uid://cqpatfifsn3sg" path="res://scenes/player.tscn" id="2_player"]
+[ext_resource type="PackedScene" path="res://scenes/fortress.tscn" id="3_fort"]
+
+[node name="Game" type="Node2D" unique_id=207958744]
+script = ExtResource("1_game")
+
+[node name="Background" type="ColorRect" parent="." unique_id=377409406]
+z_index = -100
+offset_right = 1920.0
+offset_bottom = 1080.0
+mouse_filter = 2
+color = Color(0.04, 0.05, 0.09, 1)
+
+[node name="SkyGlow" type="Polygon2D" parent="." unique_id=1064816646]
+z_index = -90
+color = Color(0.15, 0.55, 0.85, 0.12)
+
+[node name="CitySilhouette" type="Polygon2D" parent="." unique_id=581325168]
+z_index = -80
+color = Color(0.02, 0.03, 0.05, 0.85)
+polygon = PackedVector2Array(0, 420, 40, 380, 70, 400, 120, 340, 160, 370, 220, 300, 280, 360, 340, 280, 400, 350, 480, 260, 560, 340, 640, 250, 720, 330, 800, 270, 880, 350, 960, 300, 1040, 360, 1152, 320, 1152, 648, 0, 648)
+
+[node name="Fortress" parent="." unique_id=1359767194 instance=ExtResource("3_fort")]
+
+[node name="Towers" type="Node2D" parent="." unique_id=1611341392]
+
+[node name="Player" parent="." unique_id=14764265 instance=ExtResource("2_player")]
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=1380452068]
+position = Vector2(360, 640)

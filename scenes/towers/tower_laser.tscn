@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://1pa1q7oa6pqj"]
+
+[ext_resource type="Script" uid="uid://bid66kvi6g1em" path="res://scripts/towers/tower_laser.gd" id="1"]
+
+[node name="TowerLaser" type="Node2D" unique_id=843763498]
+script = ExtResource("1")

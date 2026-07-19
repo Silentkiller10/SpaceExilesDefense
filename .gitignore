@@ -1,0 +1,28 @@
+# Godot 4 cache/imported files
+.godot/
+
+# Godot 3 legacy
+.import/
+*.translation
+
+# Editor temp files
+*.tmp
+
+# Exports
+export.cfg
+export_presets.cfg
+build/
+
+# Android build artifacts (keep source config)
+android/build/bin/
+android/build/build/
+android/build/.gradle/
+android/build/libs/
+
+# Mono-specific ignores
+.mono/
+data_*/
+
+# OS junk
+Thumbs.db
+.DS_Store

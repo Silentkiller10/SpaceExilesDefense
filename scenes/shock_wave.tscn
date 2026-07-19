@@ -1,0 +1,9 @@
+[gd_scene format=3 uid="uid://cshockwave001"]
+
+[ext_resource type="Script" path="res://scripts/shock_wave.gd" id="1_shock"]
+
+[node name="ShockWave" type="Node2D"]
+script = ExtResource("1_shock")
+
+[node name="Ring" type="Polygon2D" parent="."]
+color = Color(0.3, 0.85, 1, 0.45)
