@@ -96,6 +96,14 @@ func _build_ui() -> void:
 	_play_btn.pressed.connect(_on_play_pressed)
 	vbox.add_child(_play_btn)
 
+	var test_btn = Button.new()
+	test_btn.text = "Tower Test Range"
+	test_btn.custom_minimum_size = Vector2(240, 44)
+	test_btn.modulate = Color(0.55, 1.0, 0.85)
+	test_btn.tooltip_text = "All towers unlocked, endless waves, no rewards"
+	test_btn.pressed.connect(_on_test_range_pressed)
+	vbox.add_child(test_btn)
+
 	var char_btn = Button.new()
 	char_btn.text = "Character"
 	char_btn.custom_minimum_size = Vector2(240, 44)
@@ -141,8 +149,13 @@ func _refresh_stage_ui() -> void:
 	_play_btn.text = "Deploy Stage %d" % s
 
 func _on_play_pressed():
+	PlayerData.tower_test_mode = false
 	PlayerData.clamp_selected_stage()
 	PlayerData.save_data()
+	get_tree().change_scene_to_file("res://scenes/game.tscn")
+
+func _on_test_range_pressed():
+	PlayerData.tower_test_mode = true
 	get_tree().change_scene_to_file("res://scenes/game.tscn")
 
 func _on_character_pressed():

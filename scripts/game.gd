@@ -7,13 +7,16 @@ var level: int = 1
 var kills_to_next_level: int = 6
 var run_time: float = 0.0
 var game_over: bool = false
+## Tower test range: all towers unlocked, endless waves, no progression/rewards
+var test_mode: bool = false
 
 var unlocked_towers: Dictionary = {
 	"laser": false,
 	"cannon": false,
 	"machinegun": false,
 	"railgun": false,
-	"flamethrower": false
+	"flamethrower": false,
+	"rocket": false
 }
 
 var towers: Dictionary = {}
@@ -61,7 +64,8 @@ var tower_scenes := {
 	"cannon": preload("res://scenes/towers/tower_cannon.tscn"),
 	"machinegun": preload("res://scenes/towers/tower_machinegun.tscn"),
 	"railgun": preload("res://scenes/towers/tower_railgun.tscn"),
-	"flamethrower": preload("res://scenes/towers/tower_flamethrower.tscn")
+	"flamethrower": preload("res://scenes/towers/tower_flamethrower.tscn"),
+	"rocket": preload("res://scenes/towers/tower_rocket.tscn")
 }
 
 func _ready():
@@ -84,10 +88,17 @@ func _ready():
 	camera.position = arena_size * 0.5
 	camera.make_current()
 
+	test_mode = PlayerData.tower_test_mode
+
 	_spawn_tower_slots()
-	# Start with Laser + Machine Gun so towers carry early DPS
-	_unlock_tower("laser")
-	_unlock_tower("machinegun")
+	if test_mode:
+		# Test range: every tower available from the start
+		for id in towers.keys():
+			_unlock_tower(id)
+	else:
+		# Start with Laser + Machine Gun so towers carry early DPS
+		_unlock_tower("laser")
+		_unlock_tower("machinegun")
 
 	gear = GearSystemScript.new()
 	add_child(gear)
@@ -96,6 +107,10 @@ func _ready():
 	wave_manager = WaveManagerScript.new()
 	add_child(wave_manager)
 	wave_manager.setup(arena_size.x, fortress.get_leak_y(), enemy_scene, boss_scene, player, fortress, PlayerData.selected_stage)
+	if test_mode:
+		wave_manager.set_test_mode(true)
+		# Beefier fortress so tower testing lasts longer
+		fortress.increase_max_health(1500)
 	wave_manager.creep_spawned.connect(_on_creep_spawned)
 	wave_manager.boss_incoming.connect(_on_boss_incoming)
 	wave_manager.wave_started.connect(_on_wave_started)
@@ -131,7 +146,7 @@ func _setup_arena_visuals() -> void:
 		city.color = Color(0.02, 0.03, 0.05, 0.85)
 
 func _spawn_tower_slots() -> void:
-	var ids := ["laser", "cannon", "machinegun", "railgun", "flamethrower"]
+	var ids := ["laser", "cannon", "machinegun", "railgun", "flamethrower", "rocket"]
 	var spacing := arena_size.x / float(ids.size() + 1)
 	var y := arena_size.y - 55.0
 	for i in ids.size():
@@ -199,10 +214,14 @@ func setup_ui():
 	top.add_child(row1)
 
 	level_label = Label.new()
-	level_label.text = PlayerData.get_stage_title(PlayerData.selected_stage)
+	if test_mode:
+		level_label.text = "TOWER TEST RANGE"
+		level_label.modulate = Color(0.45, 1.0, 0.9)
+	else:
+		level_label.text = PlayerData.get_stage_title(PlayerData.selected_stage)
+		if PlayerData.is_boss_stage(PlayerData.selected_stage):
+			level_label.modulate = Color(1.0, 0.45, 0.35)
 	level_label.add_theme_font_size_override("font_size", 18)
-	if PlayerData.is_boss_stage(PlayerData.selected_stage):
-		level_label.modulate = Color(1.0, 0.45, 0.35)
 	row1.add_child(level_label)
 
 	time_label = Label.new()
@@ -211,7 +230,7 @@ func setup_ui():
 	row1.add_child(time_label)
 
 	wave_label = Label.new()
-	wave_label.text = "Wave: 0/15"
+	wave_label.text = "Wave: 0" if test_mode else "Wave: 0/15"
 	wave_label.add_theme_font_size_override("font_size", 18)
 	row1.add_child(wave_label)
 
@@ -411,11 +430,16 @@ func _on_creep_spawned(enemy) -> void:
 	enemy.connect("enemy_destroyed", on_enemy_destroyed)
 
 func _on_wave_started(wave: int) -> void:
-	wave_label.text = "Wave: %d/15" % wave
+	if test_mode:
+		wave_label.text = "Wave: %d" % wave
+	else:
+		wave_label.text = "Wave: %d/15" % wave
 
 func _on_boss_incoming(_wave: int) -> void:
 	boss_banner.visible = true
-	if PlayerData.is_boss_stage(PlayerData.selected_stage):
+	if test_mode:
+		boss_banner.text = "TEST BOSS INCOMING"
+	elif PlayerData.is_boss_stage(PlayerData.selected_stage):
 		boss_banner.text = "MEGA BOSS — %s" % PlayerData.get_stage_name(PlayerData.selected_stage).to_upper()
 	else:
 		boss_banner.text = "FINAL BOSS INCOMING"
@@ -430,13 +454,15 @@ func on_enemy_destroyed(enemy):
 	var is_boss_kill := false
 	if enemy != null and (enemy.get("is_boss") == true or String(enemy.name).to_lower().contains("boss")):
 		is_boss_kill = true
-	PlayerData.add_char_xp(PlayerData.get_kill_xp(is_boss_kill))
-	_refresh_xp_hud()
+	# Test range grants no persistent XP
+	if not test_mode:
+		PlayerData.add_char_xp(PlayerData.get_kill_xp(is_boss_kill))
+		_refresh_xp_hud()
 	if kill_count >= kills_to_next_level:
 		trigger_level_up()
 
 func _on_level_complete(_wave: int) -> void:
-	if game_over:
+	if game_over or test_mode:
 		return
 	game_over = true
 	wave_manager.stop()
@@ -715,6 +741,8 @@ func apply_card(card: Dictionary) -> void:
 			_unlock_tower("railgun")
 		"tower_flamethrower":
 			_unlock_tower("flamethrower")
+		"tower_rocket":
+			_unlock_tower("rocket")
 
 func _apply_tower_specialist(card: Dictionary) -> void:
 	var target_id := String(card.get("target", ""))
@@ -744,6 +772,9 @@ func _apply_tower_specialist(card: Dictionary) -> void:
 		"fire_rate":
 			if tower.has_method("apply_fire_rate_mult"):
 				tower.apply_fire_rate_mult(amount)
+		"aoe_mult":
+			if tower.has_method("apply_aoe_mult"):
+				tower.apply_aoe_mult(amount)
 
 func _buff_all_tower_range(mult_add: float) -> void:
 	for id in towers.keys():
@@ -780,13 +811,24 @@ func _show_game_over() -> void:
 	game_over_panel.add_child(vbox)
 
 	var title := Label.new()
-	title.text = "FORTRESS DESTROYED"
+	title.text = "TEST OVER — FORTRESS DOWN" if test_mode else "FORTRESS DESTROYED"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 20)
 	vbox.add_child(title)
 
+	if test_mode:
+		var restart_btn := Button.new()
+		restart_btn.text = "Restart Test"
+		restart_btn.pressed.connect(func():
+			get_tree().paused = false
+			get_tree().change_scene_to_file("res://scenes/game.tscn")
+		)
+		vbox.add_child(restart_btn)
+
 	var loot_title := Label.new()
-	if run_loot.is_empty():
+	if test_mode:
+		loot_title.text = "Test run — no XP, coins, or gear."
+	elif run_loot.is_empty():
 		loot_title.text = "No gear this run.\nBeat a boss (every 5 waves) to farm loot."
 	else:
 		var names: PackedStringArray = []

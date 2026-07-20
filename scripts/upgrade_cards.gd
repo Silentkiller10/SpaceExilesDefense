@@ -43,6 +43,8 @@ static func all_cards() -> Array:
 			"color": Color(0.45, 0.85, 1.0), "type": "tower", "category": "tower"},
 		{"id": "tower_flamethrower", "name": "FLAME THROWER", "description": "Short range burn spray",
 			"color": Color(1.0, 0.4, 0.1), "type": "tower", "category": "tower"},
+		{"id": "tower_rocket", "name": "ROCKET LAUNCHER", "description": "4 rockets/sec, explosive AoE",
+			"color": Color(0.4, 0.75, 1.0), "type": "tower", "category": "tower"},
 		# --- Specialist (single tower) ---
 		{"id": "spec_laser_dmg", "name": "LASER FOCUS", "description": "Laser damage +50%",
 			"color": Color(1.0, 0.35, 0.6), "type": "specialist", "category": "specialist",
@@ -89,6 +91,21 @@ static func all_cards() -> Array:
 		{"id": "spec_flame_rate", "name": "FUEL PUMP", "description": "Flame Thrower fire rate +30%",
 			"color": Color(1.0, 0.45, 0.2), "type": "specialist", "category": "specialist",
 			"target": "flamethrower", "effect": "fire_rate", "amount": 0.3},
+		{"id": "spec_rocket_salvo", "name": "FULL SALVO", "description": "Rocket Launcher +1 rocket, -10% damage",
+			"color": Color(0.45, 0.8, 1.0), "type": "specialist", "category": "specialist",
+			"target": "rocket", "effect": "shots", "amount": 1, "damage_penalty": 0.1},
+		{"id": "spec_rocket_dmg", "name": "HEAVY WARHEADS", "description": "Rocket Launcher damage +50%",
+			"color": Color(0.4, 0.75, 1.0), "type": "specialist", "category": "specialist",
+			"target": "rocket", "effect": "damage_mult", "amount": 0.5},
+		{"id": "spec_rocket_range", "name": "LONG BURN", "description": "Rocket Launcher fire range +30%",
+			"color": Color(0.5, 0.82, 1.0), "type": "specialist", "category": "specialist",
+			"target": "rocket", "effect": "range_mult", "amount": 0.3},
+		{"id": "spec_rocket_aoe", "name": "BIG BLAST", "description": "Rocket explosion AoE +40%",
+			"color": Color(0.55, 0.85, 1.0), "type": "specialist", "category": "specialist",
+			"target": "rocket", "effect": "aoe_mult", "amount": 0.4},
+		{"id": "spec_rocket_rate", "name": "RAPID RELOAD", "description": "Rocket Launcher fire rate +30%",
+			"color": Color(0.6, 0.87, 1.0), "type": "specialist", "category": "specialist",
+			"target": "rocket", "effect": "fire_rate", "amount": 0.3},
 	]
 
 static func category_label(category: String) -> String:

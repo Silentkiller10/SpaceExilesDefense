@@ -9,15 +9,11 @@ const GOLD := Color(1.0, 0.82, 0.25, 1.0)
 const MUZZLE := Color(0.75, 1.0, 0.95, 1.0)
 
 ## In-game scale — BodyLR / BodyRotate node scale in player.tscn animations.
-const COMBAT_SCALE := 0.72
-## Soldier mesh multiplier inside BodyLR (bigger silhouette vs gun).
-const BODY_MESH_SCALE := 1.55
-## Rifle mesh multiplier inside BodyRotate (smaller vs soldier).
-const WEAPON_MESH_SCALE := 0.68
-const WEAPON_MUZZLE_X := 54.0 * WEAPON_MESH_SCALE
+const COMBAT_SCALE := 0.936
 
-const WALK_SHEET_PATH := "res://assets/sprites/player_walk_spritesheet.png"
-const WALK_FRAME_COUNT := 6
+const WALK_SHEET_PATH := "res://assets/sprites/player_walk_final.png"
+const WALK_FRAME_COUNT := 25
+const WALK_FPS := 24.0
 ## Spritesheet art faces right (frame 0 = idle, frames advance toward a rightward stride).
 const SPRITE_TARGET_HEIGHT := 145.0
 ## Muzzle distance along BodyRotate +X (aim axis); sprite gun points upward in side view.
@@ -119,7 +115,7 @@ static func build_sprite_body(parent: Node2D) -> AnimatedSprite2D:
 		frames.add_frame("idle", idle_frame)
 
 		frames.add_animation("walk")
-		frames.set_animation_speed("walk", 10.0)
+		frames.set_animation_speed("walk", WALK_FPS)
 		frames.set_animation_loop("walk", true)
 		for i in WALK_FRAME_COUNT:
 			var frame_tex := AtlasTexture.new()
@@ -135,212 +131,6 @@ static func build_sprite_body(parent: Node2D) -> AnimatedSprite2D:
 	anim.animation = "idle"
 	parent.add_child(anim)
 	return anim
-
-## Top-down sci-fi soldier body (no weapon — gun lives on BodyRotate).
-static func build_combat_body(parent: Node2D) -> void:
-	for c in parent.get_children():
-		if c.name != "Shadow":
-			c.queue_free()
-
-	var root := Node2D.new()
-	root.name = "VisualRoot"
-	root.scale = Vector2(BODY_MESH_SCALE, BODY_MESH_SCALE)
-	root.z_index = 1
-	parent.add_child(root)
-
-	var shadow := Polygon2D.new()
-	shadow.polygon = _ellipse(Vector2(0, 46), Vector2(42, 14), 14)
-	shadow.color = Color(0, 0, 0, 0.45)
-	shadow.z_index = -3
-	root.add_child(shadow)
-
-	# Boots
-	for side in [-1, 1]:
-		var boot := Polygon2D.new()
-		boot.polygon = PackedVector2Array([
-			Vector2(-8 * side, 28), Vector2(-18 * side, 30), Vector2(-20 * side, 46),
-			Vector2(-6 * side, 48), Vector2(2 * side, 42)
-		])
-		boot.color = HULL_LIT.darkened(0.2)
-		root.add_child(boot)
-
-	# Legs
-	for side in [-1, 1]:
-		var leg := Polygon2D.new()
-		leg.polygon = PackedVector2Array([
-			Vector2(-6 * side, 8), Vector2(-14 * side, 10), Vector2(-16 * side, 30), Vector2(-4 * side, 28)
-		])
-		leg.color = ARMOR
-		root.add_child(leg)
-
-	# Torso / tactical vest
-	var torso := Polygon2D.new()
-	torso.polygon = PackedVector2Array([
-		Vector2(-24, 8), Vector2(-28, -8), Vector2(-20, -26), Vector2(20, -26),
-		Vector2(28, -8), Vector2(24, 8), Vector2(14, 14), Vector2(-14, 14)
-	])
-	torso.color = ARMOR
-	root.add_child(torso)
-
-	var vest_edge := Line2D.new()
-	vest_edge.points = torso.polygon
-	vest_edge.width = 1.5
-	vest_edge.default_color = HULL_LIT
-	vest_edge.closed = true
-	root.add_child(vest_edge)
-
-	# Chest light
-	var core := Polygon2D.new()
-	core.name = "ChestCore"
-	core.polygon = _scale_poly(_hex(7, 6), Vector2(1, 1))
-	core.position = Vector2(0, -6)
-	core.color = CYAN
-	root.add_child(core)
-
-	# Shoulder pads
-	for side in [-1, 1]:
-		var pad := Polygon2D.new()
-		pad.polygon = PackedVector2Array([
-			Vector2(18 * side, -22), Vector2(34 * side, -16), Vector2(32 * side, -2), Vector2(14 * side, -6)
-		])
-		pad.color = HULL_LIT
-		root.add_child(pad)
-
-		var pad_stripe := Line2D.new()
-		pad_stripe.points = PackedVector2Array([
-			Vector2(22 * side, -18), Vector2(28 * side, -8)
-		])
-		pad_stripe.width = 2.0
-		pad_stripe.default_color = CYAN
-		root.add_child(pad_stripe)
-
-	# Arms / gauntlets (reach toward rifle grip)
-	for side in [-1, 1]:
-		var arm := Polygon2D.new()
-		arm.polygon = PackedVector2Array([
-			Vector2(12 * side, -2), Vector2(24 * side, -6), Vector2(28 * side, 6), Vector2(16 * side, 10)
-		])
-		arm.color = HULL_LIT.darkened(0.06)
-		root.add_child(arm)
-
-		var gauntlet := Polygon2D.new()
-		gauntlet.polygon = _scale_poly(_hex(5, 6), Vector2(1, 1))
-		gauntlet.position = Vector2(26 * side, 2)
-		gauntlet.color = ARMOR.lightened(0.08)
-		root.add_child(gauntlet)
-
-	# Helmet
-	var helm := Polygon2D.new()
-	helm.polygon = _ellipse(Vector2(0, -36), Vector2(22, 24), 14)
-	helm.color = HULL
-	root.add_child(helm)
-
-	var helm_ridge := Line2D.new()
-	helm_ridge.points = PackedVector2Array([
-		Vector2(0, -58), Vector2(0, -44)
-	])
-	helm_ridge.width = 3.0
-	helm_ridge.default_color = HULL_LIT
-	root.add_child(helm_ridge)
-
-	var visor := Polygon2D.new()
-	visor.polygon = PackedVector2Array([
-		Vector2(-18, -44), Vector2(18, -44), Vector2(16, -28), Vector2(-16, -28)
-	])
-	visor.color = Color(CYAN.r, CYAN.g, CYAN.b, 0.75)
-	root.add_child(visor)
-
-	var visor_glow := Line2D.new()
-	visor_glow.points = visor.polygon
-	visor_glow.width = 1.5
-	visor_glow.default_color = Color(CYAN.r, CYAN.g, CYAN.b, 0.9)
-	visor_glow.closed = true
-	root.add_child(visor_glow)
-
-	# Backpack / comm pack
-	var pack := Polygon2D.new()
-	pack.polygon = PackedVector2Array([
-		Vector2(-10, -18), Vector2(10, -18), Vector2(8, 6), Vector2(-8, 6)
-	])
-	pack.color = HULL.darkened(0.1)
-	pack.z_index = -1
-	root.add_child(pack)
-
-	_start_soldier_pulse(root)
-
-## Sci-fi assault rifle on BodyRotate — points along +X toward BulletSpawnPoint.
-static func build_combat_weapon(parent: Node2D) -> void:
-	var existing := parent.get_node_or_null("WeaponVisual")
-	if existing:
-		existing.queue_free()
-
-	var gun := Node2D.new()
-	gun.name = "WeaponVisual"
-	gun.position = Vector2(0, -6)
-	gun.scale = Vector2(WEAPON_MESH_SCALE, WEAPON_MESH_SCALE)
-	gun.z_index = 3
-	parent.add_child(gun)
-	parent.move_child(gun, 0)
-
-	# Stock
-	var stock := Polygon2D.new()
-	stock.polygon = PackedVector2Array([
-		Vector2(-22, -5), Vector2(-8, -7), Vector2(-6, 5), Vector2(-20, 7)
-	])
-	stock.color = HULL_LIT.darkened(0.15)
-	gun.add_child(stock)
-
-	# Receiver
-	var receiver := Polygon2D.new()
-	receiver.polygon = PackedVector2Array([
-		Vector2(-8, -8), Vector2(14, -8), Vector2(16, 8), Vector2(-6, 8)
-	])
-	receiver.color = HULL
-	gun.add_child(receiver)
-
-	# Magazine
-	var mag := Polygon2D.new()
-	mag.polygon = PackedVector2Array([
-		Vector2(2, 8), Vector2(10, 8), Vector2(8, 20), Vector2(0, 20)
-	])
-	mag.color = HULL_LIT.darkened(0.2)
-	gun.add_child(mag)
-
-	# Barrel shroud
-	var barrel := Polygon2D.new()
-	barrel.polygon = PackedVector2Array([
-		Vector2(14, -5), Vector2(52, -4), Vector2(54, 0), Vector2(52, 4), Vector2(14, 5)
-	])
-	barrel.color = ARMOR
-	gun.add_child(barrel)
-
-	# Energy rails on barrel
-	for y in [-2.5, 2.5]:
-		var rail := Line2D.new()
-		rail.points = PackedVector2Array([Vector2(18, y), Vector2(48, y)])
-		rail.width = 1.5
-		rail.default_color = Color(CYAN.r, CYAN.g, CYAN.b, 0.85)
-		gun.add_child(rail)
-
-	# Scope
-	var scope := Polygon2D.new()
-	scope.polygon = PackedVector2Array([
-		Vector2(4, -12), Vector2(16, -12), Vector2(16, -8), Vector2(4, -8)
-	])
-	scope.color = HULL_LIT
-	gun.add_child(scope)
-
-	# Muzzle brake
-	var muzzle := Polygon2D.new()
-	muzzle.name = "MuzzleGlow"
-	muzzle.polygon = _scale_poly(_hex(5, 6), Vector2(1.2, 1.0))
-	muzzle.position = Vector2(54, 0)
-	muzzle.color = MUZZLE
-	gun.add_child(muzzle)
-
-	var tw := gun.create_tween().set_loops()
-	tw.tween_property(muzzle, "modulate:a", 0.45, 0.35)
-	tw.tween_property(muzzle, "modulate:a", 1.0, 0.35)
 
 ## Character screen — soldier holding rifle.
 static func build_paper_doll(parent: Control) -> void:
@@ -509,14 +299,6 @@ static func _add_rifle_shape(parent: Node2D, scale_mul: float = 1.0) -> void:
 	muzzle.position = Vector2(64 * s, 0)
 	muzzle.color = MUZZLE
 	parent.add_child(muzzle)
-
-static func _start_soldier_pulse(root: Node2D) -> void:
-	var core: Node = root.get_node_or_null("ChestCore")
-	if core == null:
-		return
-	var tw := root.create_tween().set_loops()
-	tw.tween_property(core, "modulate", Color(0.7, 1.2, 1.2), 0.6)
-	tw.tween_property(core, "modulate", Color(1.0, 1.0, 1.0), 0.6)
 
 static func _hex(r: float, seg: int) -> PackedVector2Array:
 	var pts: PackedVector2Array = []

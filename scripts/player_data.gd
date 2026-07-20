@@ -45,6 +45,8 @@ var levels_cleared: int = 0
 var current_stage: int = 1
 var selected_stage: int = 1
 var coins: int = 0
+## Session-only: next game scene loads as the tower test range (no progression/rewards)
+var tower_test_mode: bool = false
 var _uid_counter: int = 1
 var _tex_cache: Dictionary = {}
 

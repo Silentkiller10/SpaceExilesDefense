@@ -23,7 +23,12 @@ var active_enemies: Array = []
 var timer: float = 0.0
 var running: bool = false
 var waiting_for_clear: bool = false
+## Endless sandbox: waves never stop, boss every 5th wave, no level_complete
+var test_mode: bool = false
 var rng := RandomNumberGenerator.new()
+
+func set_test_mode(enabled: bool) -> void:
+	test_mode = enabled
 
 func setup(width: float, fort_y: float, enemy: PackedScene, boss: PackedScene, p: CharacterBody2D, f: Node2D, stage_num: int = 1) -> void:
 	arena_width = width
@@ -52,13 +57,13 @@ func _process(delta: float) -> void:
 			level_complete.emit(wave)
 		return
 
-	if wave >= max_waves:
+	if not test_mode and wave >= max_waves:
 		return
 
 	timer -= delta
 	if timer <= 0.0:
 		_start_next_wave()
-		if wave < max_waves:
+		if test_mode or wave < max_waves:
 			timer = max(4.0, wave_interval - wave * 0.15)
 		else:
 			waiting_for_clear = true
@@ -67,8 +72,12 @@ func _start_next_wave() -> void:
 	wave += 1
 	wave_started.emit(wave)
 
-	var is_final_boss := wave == max_waves
-	if is_final_boss:
+	var is_boss_wave: bool
+	if test_mode:
+		is_boss_wave = wave > 0 and wave % 5 == 0
+	else:
+		is_boss_wave = wave == max_waves
+	if is_boss_wave:
 		boss_incoming.emit(wave)
 		_spawn_boss()
 		# Escort creeps with the boss (heavier guard on boss stages)
@@ -81,6 +90,8 @@ func _start_next_wave() -> void:
 		var count := 4 + wave * 2 + stage
 		if _is_boss_stage():
 			count += 3
+		if test_mode:
+			count = mini(count, 26)
 		for i in range(count):
 			_spawn_creep()
 

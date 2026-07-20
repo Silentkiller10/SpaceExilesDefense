@@ -216,8 +216,7 @@ func update_body_lr():
 	_body_anim.flip_h = not facing_right
 
 	if abs(velocity.x) > 0:
-		# Reversed playback when mirrored so the stride matches travel.
-		_body_anim.speed_scale = -1.0 if _body_anim.flip_h else 1.0
+		_body_anim.speed_scale = 1.0
 		if _body_anim.animation != "walk":
 			_body_anim.play("walk")
 	else:
