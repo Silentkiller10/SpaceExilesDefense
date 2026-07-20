@@ -1,18 +1,35 @@
 extends "res://scripts/towers/tower_base.gd"
 
-## Procedural flamethrower — fuel tank, wide nozzle, layered fire cone.
+## Sprite flamethrower — tripod base + rotating cannon head, layered fire cone.
 
 const V := preload("res://scripts/towers/tower_visuals.gd")
+const TEX_BASE_PATH := "res://assets/png/towers/flamethrower_base.png"
+const TEX_HEAD_PATH := "res://assets/png/towers/flamethrower_head.png"
+
 const CORE := Color(1.0, 0.45, 0.1)
 const HOT := Color(1.0, 0.75, 0.15)
 const CORE_INNER := Color(1.0, 0.95, 0.35)
 
-var _turret: Node2D
-var _nozzle: Polygon2D
-var _tank_glow: Polygon2D
+const TOWER_SCALE := 0.72
+## Base art is 530x234, head art is 915x497 (points along +X).
+const BASE_SCALE := 0.30 * TOWER_SCALE
+const HEAD_SCALE := 0.155 * TOWER_SCALE
+const AIM_SPEED := 12.0
+const HEAD_FACING_OFFSET := 0.0
+const PIVOT_OFFSET := Vector2(0.0, -26.0) * TOWER_SCALE
+const BASE_Y_OFFSET := 6.0 * TOWER_SCALE
+const SHADOW_RADIUS := 18.0 * TOWER_SCALE
+const LABEL_Y := 24.0 * TOWER_SCALE
+
+var _base_sprite: Sprite2D
+var _pivot: Node2D
+var _head_sprite: Sprite2D
+var _glow_sprite: Sprite2D
 var _muzzle: Node2D
-var _mount_glow: Polygon2D
+var _head_mount_tex: Vector2
+var _muzzle_tex: Vector2
 var _heat: float = 0.0
+var _recoil: float = 0.0
 var _idle_t: float = 0.0
 
 func _ready() -> void:
@@ -24,60 +41,93 @@ func unlock() -> void:
 	V.play_unlock(self)
 
 func _build_visual() -> void:
-	var platform := V.build_platform(self, V.BaseStyle.COMPACT, CORE)
-	body = platform.body
-	_mount_glow = platform.mount_glow
+	V.add_shadow(self, SHADOW_RADIUS)
 
-	_turret = Node2D.new()
-	_turret.position = Vector2(0, -3)
-	_turret.z_index = 2
-	add_child(_turret)
+	body = Polygon2D.new()
+	body.visible = false
+	add_child(body)
 
-	# Fuel tank
-	var tank := Polygon2D.new()
-	tank.polygon = PackedVector2Array([
-		Vector2(-18, 4), Vector2(-16, -10), Vector2(-6, -14), Vector2(4, -10),
-		Vector2(6, 4), Vector2(0, 8), Vector2(-10, 8)
-	])
-	tank.color = Color(0.12, 0.07, 0.05)
-	_turret.add_child(tank)
+	var tex_base: Texture2D = load(TEX_BASE_PATH) as Texture2D
+	var tex_head: Texture2D = load(TEX_HEAD_PATH) as Texture2D
 
-	_tank_glow = Polygon2D.new()
-	_tank_glow.polygon = V.scale_poly(V.hex_points(5, 6), Vector2(1, 1))
-	_tank_glow.position = Vector2(-8, -4)
-	_tank_glow.color = Color(CORE.r, CORE.g, CORE.b, 0.45)
-	_turret.add_child(_tank_glow)
+	_base_sprite = Sprite2D.new()
+	_base_sprite.texture = tex_base
+	_base_sprite.scale = Vector2(BASE_SCALE, BASE_SCALE)
+	_base_sprite.position = Vector2(0, BASE_Y_OFFSET)
+	_base_sprite.z_index = 0
+	add_child(_base_sprite)
 
-	_nozzle = Polygon2D.new()
-	_nozzle.polygon = PackedVector2Array([
-		Vector2(6, -6), Vector2(12, -8), Vector2(28, -10), Vector2(32, -6),
-		Vector2(32, -2), Vector2(28, 2), Vector2(12, 0), Vector2(6, -2)
-	])
-	_nozzle.color = V.HULL_LIT.darkened(0.2)
-	_turret.add_child(_nozzle)
-	V.add_housing_edge(_turret, _nozzle.polygon)
+	_pivot = Node2D.new()
+	_pivot.position = _base_sprite.position + PIVOT_OFFSET
+	_pivot.z_index = 1
+	add_child(_pivot)
+
+	var head_size: Vector2 = tex_head.get_size() if tex_head else Vector2(915, 497)
+	## Rear mount sits behind center; barrel axis is slightly below center.
+	_head_mount_tex = Vector2(-head_size.x * 0.30, head_size.y * 0.14)
+	_muzzle_tex = Vector2(head_size.x * 0.46, head_size.y * 0.12)
+
+	_head_sprite = Sprite2D.new()
+	_head_sprite.texture = tex_head
+	_head_sprite.scale = Vector2(HEAD_SCALE, HEAD_SCALE)
+	_head_sprite.position = -_head_mount_tex * HEAD_SCALE
+	_head_sprite.z_index = 1
+	_pivot.add_child(_head_sprite)
+
+	_glow_sprite = Sprite2D.new()
+	_glow_sprite.texture = tex_head
+	_glow_sprite.scale = _head_sprite.scale
+	_glow_sprite.position = _head_sprite.position
+	_glow_sprite.z_index = 0
+	_glow_sprite.modulate = Color(CORE.r, CORE.g, CORE.b, 0.0)
+	_pivot.add_child(_glow_sprite)
+	_pivot.move_child(_glow_sprite, 0)
 
 	_muzzle = Node2D.new()
-	_muzzle.position = Vector2(32, -4)
-	_turret.add_child(_muzzle)
+	_muzzle.position = (_muzzle_tex - _head_mount_tex) * HEAD_SCALE
+	_head_sprite.add_child(_muzzle)
 
-	label = V.add_label(self, "FLAME", CORE, 18)
-	_turret.rotation = -PI / 2.0
+	label = V.add_label(self, "FLAME", CORE, LABEL_Y)
+	_pivot.rotation = -PI / 2.0
 
 func _process(delta: float) -> void:
 	if not unlocked:
 		return
 	_idle_t += delta
 	_heat = move_toward(_heat, 0.0, delta * 2.5)
-	V.aim_turret(_turret, _find_target(), delta, 12.0)
-	if _mount_glow:
-		_mount_glow.modulate.a = 0.45 + sin(_idle_t * 5.0) * 0.15 + _heat * 0.35
-	if _tank_glow:
-		_tank_glow.modulate.a = 0.35 + _heat * 0.55 + sin(_idle_t * 7.0) * 0.1
+	_recoil = move_toward(_recoil, 0.0, delta * 70.0)
+	_aim_pivot(_find_target(), delta)
+	_update_head_fx()
 	super._process(delta)
+
+func _aim_pivot(target: Node2D, delta: float) -> void:
+	if _pivot == null:
+		return
+	var desired: float = -PI / 2.0
+	if target:
+		desired = _pivot.global_position.direction_to(target.global_position).angle()
+		desired += HEAD_FACING_OFFSET
+	_pivot.rotation = lerp_angle(_pivot.rotation, desired, 1.0 - exp(-AIM_SPEED * delta))
+
+func _update_head_fx() -> void:
+	if _head_sprite == null:
+		return
+	var pulse: float = 0.5 + 0.5 * sin(_idle_t * 6.0)
+	var kick: float = _recoil * 0.015
+	var axis := Vector2.from_angle(_pivot.rotation)
+	_head_sprite.position = -_head_mount_tex * HEAD_SCALE - axis * kick
+	if _glow_sprite:
+		_glow_sprite.position = _head_sprite.position
+		_glow_sprite.scale = _head_sprite.scale * (1.0 + pulse * 0.03 + _heat * 0.10)
+		_glow_sprite.modulate.a = pulse * 0.15 + _heat * 0.45
+	if _muzzle:
+		_muzzle.position = (_muzzle_tex - _head_mount_tex) * HEAD_SCALE - axis * kick * 0.5
+	var tint: float = 1.0 + pulse * 0.05 + _heat * 0.25
+	_head_sprite.modulate = Color(tint + 0.1, tint, tint - 0.05, 1.0)
 
 func _fire(target: Node2D) -> void:
 	_heat = 1.0
+	_recoil = 6.0
 	var aim_pos: Vector2 = target.global_position if target else global_position + Vector2(0, -120)
 	_spawn_flame_cone(aim_pos)
 	for enemy in get_tree().get_nodes_in_group("enemy"):
@@ -89,9 +139,11 @@ func _fire(target: Node2D) -> void:
 				enemy.apply_burn(2.5, 45.0)
 
 func _spawn_flame_cone(to: Vector2) -> void:
-	var dir := (to - global_position).normalized()
+	var origin: Vector2 = _muzzle.global_position if _muzzle else global_position
+	var origin_local: Vector2 = origin - global_position
+	var dir := (to - origin).normalized()
 	var angle := dir.angle()
-	var length := clampf(global_position.distance_to(to), 60.0, range_px)
+	var length := clampf(origin.distance_to(to), 60.0, range_px)
 
 	var layers := [
 		{"len": length, "width": 36.0, "color": Color(CORE.r, CORE.g, CORE.b, 0.22), "z": 4},
@@ -110,6 +162,7 @@ func _spawn_flame_cone(to: Vector2) -> void:
 		flame.color = layer.color
 		flame.z_index = layer.z
 		add_child(flame)
+		flame.position = origin_local
 		flame.rotation = angle + PI / 2.0
 		var tw := create_tween()
 		tw.tween_property(flame, "modulate:a", 0.0, 0.16)
@@ -117,19 +170,17 @@ func _spawn_flame_cone(to: Vector2) -> void:
 		tw.tween_callback(flame.queue_free)
 
 	# Embers along cone
-	if _muzzle:
-		var muzzle_world := _muzzle.global_position
-		for i in 10:
-			var ember := Polygon2D.new()
-			ember.polygon = V.scale_poly(V.hex_points(2.5, 4), Vector2(1, 1))
-			ember.color = HOT if i % 3 == 0 else CORE_INNER
-			ember.z_index = 7
-			add_child(ember)
-			ember.global_position = muzzle_world
-			var spread := randf_range(-0.35, 0.35)
-			var dist := randf_range(length * 0.3, length * 0.9)
-			var fly_dir := Vector2.from_angle(angle + spread)
-			var tw2 := create_tween()
-			tw2.tween_property(ember, "global_position", muzzle_world + fly_dir * dist * 0.25, 0.14)
-			tw2.parallel().tween_property(ember, "modulate:a", 0.0, 0.14)
-			tw2.tween_callback(ember.queue_free)
+	for i in 10:
+		var ember := Polygon2D.new()
+		ember.polygon = V.scale_poly(V.hex_points(2.5, 4), Vector2(1, 1))
+		ember.color = HOT if i % 3 == 0 else CORE_INNER
+		ember.z_index = 7
+		add_child(ember)
+		ember.global_position = origin
+		var spread := randf_range(-0.35, 0.35)
+		var dist := randf_range(length * 0.3, length * 0.9)
+		var fly_dir := Vector2.from_angle(angle + spread)
+		var tw2 := create_tween()
+		tw2.tween_property(ember, "global_position", origin + fly_dir * dist * 0.25, 0.14)
+		tw2.parallel().tween_property(ember, "modulate:a", 0.0, 0.14)
+		tw2.tween_callback(ember.queue_free)
