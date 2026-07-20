@@ -10,17 +10,21 @@ const CORE := Color(0.4, 0.75, 1.0)
 const HOT := Color(0.7, 0.9, 1.0)
 
 const TOWER_SCALE := 0.72
-## Art is 1003x1024, barrels point up-right (~-40 deg).
-const SPRITE_SCALE := 0.11 * TOWER_SCALE
-const NATURAL_ANGLE := -0.7
+## Art is 841x1024, barrels point straight up.
+const SPRITE_SCALE := 0.132 * TOWER_SCALE
+const NATURAL_ANGLE := -PI / 2.0
 ## Barrel cluster tip in texture pixels from center.
-const MUZZLE_TEX := Vector2(280.0, -240.0)
+const MUZZLE_TEX := Vector2(0.0, -420.0)
+## How far the sprite's bottom edge sits below the slot position,
+## matching the platform foot of the procedural towers.
+const FOOT_MARGIN := 14.0
 const SHADOW_RADIUS := 18.0 * TOWER_SCALE
 const LABEL_Y := 26.0 * TOWER_SCALE
 
 const BLAST_RADIUS := 90.0
 
 var _sprite: Sprite2D
+var _sprite_base_pos: Vector2 = Vector2.ZERO
 var _muzzle: Node2D
 var _aoe_mult: float = 1.0
 var _recoil: float = 0.0
@@ -52,12 +56,16 @@ func _build_visual() -> void:
 	_sprite = Sprite2D.new()
 	_sprite.texture = tex
 	_sprite.scale = Vector2(SPRITE_SCALE, SPRITE_SCALE)
-	_sprite.position = Vector2(0, 0)
+	# Lift the centered sprite so its bottom edge rests on the slot line.
+	var tex_h: float = tex.get_size().y if tex else 1024.0
+	_sprite_base_pos = Vector2(0.0, FOOT_MARGIN - tex_h * 0.5 * SPRITE_SCALE)
+	_sprite.position = _sprite_base_pos
 	_sprite.z_index = 1
 	add_child(_sprite)
 
+	# Child of the scaled sprite, so its position is in texture pixels.
 	_muzzle = Node2D.new()
-	_muzzle.position = MUZZLE_TEX * SPRITE_SCALE
+	_muzzle.position = MUZZLE_TEX
 	_sprite.add_child(_muzzle)
 
 	label = V.add_label(self, "ROCKET", CORE, LABEL_Y)
@@ -69,7 +77,7 @@ func _process(delta: float) -> void:
 	_recoil = move_toward(_recoil, 0.0, delta * 30.0)
 	# Static turret — only a recoil kick along the barrel axis.
 	if _sprite:
-		_sprite.position = -Vector2.from_angle(NATURAL_ANGLE) * _recoil * 0.35
+		_sprite.position = _sprite_base_pos - Vector2.from_angle(NATURAL_ANGLE) * _recoil * 0.35
 	super._process(delta)
 
 func _fire(target: Node2D) -> void:
