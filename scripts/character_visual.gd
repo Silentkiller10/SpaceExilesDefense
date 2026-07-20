@@ -19,6 +19,31 @@ const SPRITE_TARGET_HEIGHT := 145.0
 ## Muzzle distance along BodyRotate +X (aim axis); sprite gun points upward in side view.
 const SPRITE_MUZZLE_X := 48.0
 
+## Kneeling firing poses — picked by aim angle while shooting.
+## Index 0 = most horizontal aim ("1"), index 3 = almost vertical ("4").
+const FIRE_POSE_DIR := "res://assets/sprites/fire_poses/"
+## One shared scale for every pose so the body stays the same size and only
+## the gun direction changes (pose PNGs differ in size because of the gun).
+const FIRE_POSE_SCALE := 0.26
+## Where the pose's feet/knee line sits in BodyLR space — matches the walk
+## sprite's feet (position.y + half height at SPRITE_TARGET_HEIGHT).
+const FIRE_POSE_FEET_Y := 104.0
+
+static func load_fire_poses() -> Dictionary:
+	var out := {"center": null, "left": [], "right": []}
+	var center_path := FIRE_POSE_DIR + "center.png"
+	if ResourceLoader.exists(center_path):
+		out["center"] = load(center_path)
+	for side in ["left", "right"]:
+		for i in range(1, 5):
+			var path := "%s%s %d.png" % [FIRE_POSE_DIR, side, i]
+			if ResourceLoader.exists(path):
+				out[side].append(load(path))
+	# Only usable if the whole set is present
+	if out["center"] == null or out["left"].size() != 4 or out["right"].size() != 4:
+		return {}
+	return out
+
 const EQUIPMENT_PANEL_PATH := "res://assets/png/player_character.png"
 const EQUIPMENT_PANEL_H_OVER_W := 1024.0 / 738.0
 const EQUIPMENT_IMAGE_SIZE := Vector2(738.0, 1024.0)

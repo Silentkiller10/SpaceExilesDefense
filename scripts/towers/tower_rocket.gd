@@ -71,7 +71,7 @@ func _build_visual() -> void:
 	label = V.add_label(self, "ROCKET", CORE, LABEL_Y)
 
 func _process(delta: float) -> void:
-	if not unlocked:
+	if not unlocked or sandbox_disabled:
 		return
 	_idle_t += delta
 	_recoil = move_toward(_recoil, 0.0, delta * 30.0)

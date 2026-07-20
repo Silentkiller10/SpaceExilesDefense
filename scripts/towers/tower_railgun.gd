@@ -89,7 +89,7 @@ func _build_visual() -> void:
 	_turret.rotation = -PI / 2.0
 
 func _process(delta: float) -> void:
-	if not unlocked:
+	if not unlocked or sandbox_disabled:
 		return
 	_idle_t += delta
 	_recoil = move_toward(_recoil, 0.0, delta * 35.0)

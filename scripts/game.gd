@@ -45,6 +45,8 @@ var coins_label: Label
 var pause_panel: PanelContainer
 var is_paused_menu: bool = false
 var run_upgrades: Array = [] # {name, id, desc} taken this run
+## Sandbox: how many enemies each spawn button press creates (1 / 10 / 25)
+var sandbox_spawn_amount: int = 1
 
 @onready var camera: Camera2D = $Camera2D
 @onready var background: ColorRect = $Background
@@ -81,7 +83,9 @@ func _ready():
 	fortress.health_changed.connect(_on_fortress_health_changed)
 	fortress.fortress_destroyed.connect(_on_fortress_destroyed)
 
-	var rampart_y := arena_size.y - 100.0
+	# Player fights from an elevated ramp walkway above the tower row
+	var rampart_y := arena_size.y - 300.0
+	_setup_ramp_walkway(rampart_y + 20.0)
 	player.set_arena(arena_size.x, rampart_y)
 	player.setup(Vector2(arena_size.x * 0.5, rampart_y))
 
@@ -89,6 +93,9 @@ func _ready():
 	camera.make_current()
 
 	test_mode = PlayerData.tower_test_mode
+	if test_mode:
+		# Sandbox: the character only fires while the mouse is clicked/held
+		player.manual_fire_only = true
 
 	_spawn_tower_slots()
 	if test_mode:
@@ -145,6 +152,65 @@ func _setup_arena_visuals() -> void:
 		])
 		city.color = Color(0.02, 0.03, 0.05, 0.85)
 
+func _setup_ramp_walkway(surface_y: float) -> void:
+	var ramp := Node2D.new()
+	ramp.name = "RampWalkway"
+	ramp.z_index = -10
+	add_child(ramp)
+
+	var w := arena_size.x
+	var deck_h := 24.0
+	var margin := 16.0
+	var ground_y := arena_size.y - 80.0
+
+	var deck := Polygon2D.new()
+	deck.polygon = PackedVector2Array([
+		Vector2(margin, surface_y),
+		Vector2(w - margin, surface_y),
+		Vector2(w - margin, surface_y + deck_h),
+		Vector2(margin, surface_y + deck_h)
+	])
+	deck.color = Color(0.12, 0.18, 0.28, 1.0)
+	ramp.add_child(deck)
+
+	# Glowing walk-surface edge
+	var edge := Polygon2D.new()
+	edge.polygon = PackedVector2Array([
+		Vector2(margin, surface_y),
+		Vector2(w - margin, surface_y),
+		Vector2(w - margin, surface_y + 4.0),
+		Vector2(margin, surface_y + 4.0)
+	])
+	edge.color = Color(0.25, 0.75, 0.95, 0.9)
+	ramp.add_child(edge)
+
+	# Angled ramp ends connecting the walkway down to the fortress roof
+	for side: float in [-1.0, 1.0]:
+		var edge_x := margin if side < 0.0 else w - margin
+		var foot_x := edge_x + side * 90.0
+		var side_ramp := Polygon2D.new()
+		side_ramp.polygon = PackedVector2Array([
+			Vector2(edge_x, surface_y),
+			Vector2(edge_x, surface_y + deck_h),
+			Vector2(clampf(foot_x, 0.0, w), ground_y)
+		])
+		side_ramp.color = Color(0.1, 0.15, 0.24, 1.0)
+		ramp.add_child(side_ramp)
+
+	# Support pillars down to the fortress roofline
+	var pillar_count := 5
+	for i in pillar_count:
+		var x := lerpf(margin + 50.0, w - margin - 50.0, float(i) / float(pillar_count - 1))
+		var pillar := Polygon2D.new()
+		pillar.polygon = PackedVector2Array([
+			Vector2(x - 7.0, surface_y + deck_h),
+			Vector2(x + 7.0, surface_y + deck_h),
+			Vector2(x + 7.0, ground_y),
+			Vector2(x - 7.0, ground_y)
+		])
+		pillar.color = Color(0.08, 0.12, 0.2, 1.0)
+		ramp.add_child(pillar)
+
 func _spawn_tower_slots() -> void:
 	var ids := ["laser", "cannon", "machinegun", "railgun", "flamethrower", "rocket"]
 	var spacing := arena_size.x / float(ids.size() + 1)
@@ -161,6 +227,17 @@ func _unlock_tower(id: String) -> void:
 	unlocked_towers[id] = true
 	if towers.has(id) and towers[id].has_method("unlock"):
 		towers[id].unlock()
+
+## Sandbox: click a tower to switch it on/off
+func _unhandled_input(event) -> void:
+	if not test_mode or game_over:
+		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		var pos: Vector2 = get_global_mouse_position()
+		for tower in towers.values():
+			if tower.global_position.distance_to(pos) <= 55.0:
+				tower.toggle_sandbox_disabled()
+				break
 
 func setup_ui():
 	ui_layer = CanvasLayer.new()
@@ -215,7 +292,7 @@ func setup_ui():
 
 	level_label = Label.new()
 	if test_mode:
-		level_label.text = "TOWER TEST RANGE"
+		level_label.text = "SANDBOX"
 		level_label.modulate = Color(0.45, 1.0, 0.9)
 	else:
 		level_label.text = PlayerData.get_stage_title(PlayerData.selected_stage)
@@ -282,6 +359,77 @@ func setup_ui():
 	pause_btn.process_mode = Node.PROCESS_MODE_ALWAYS
 	pause_btn.pressed.connect(_toggle_pause_menu)
 	ui_layer.add_child(pause_btn)
+
+	if test_mode:
+		_build_sandbox_panel()
+
+func _build_sandbox_panel() -> void:
+	var panel := PanelContainer.new()
+	panel.position = Vector2(8, 180)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.05, 0.07, 0.12, 0.9)
+	style.border_color = Color(0.35, 0.9, 1.0, 0.6)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(8)
+	style.set_content_margin_all(8)
+	panel.add_theme_stylebox_override("panel", style)
+	ui_layer.add_child(panel)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 2)
+	panel.add_child(box)
+
+	var title := Label.new()
+	title.text = "SPAWN ENEMIES"
+	title.add_theme_font_size_override("font_size", 14)
+	title.modulate = Color(0.45, 1.0, 0.9)
+	box.add_child(title)
+
+	# Amount selector: 1 / 10 / 25 per press
+	var amount_row := HBoxContainer.new()
+	amount_row.add_theme_constant_override("separation", 4)
+	box.add_child(amount_row)
+	var group := ButtonGroup.new()
+	for amt in [1, 10, 25]:
+		var toggle := Button.new()
+		toggle.text = str(amt)
+		toggle.toggle_mode = true
+		toggle.button_group = group
+		toggle.custom_minimum_size = Vector2(40, 28)
+		toggle.add_theme_font_size_override("font_size", 13)
+		toggle.button_pressed = (amt == 1)
+		toggle.toggled.connect(_on_sandbox_amount_toggled.bind(amt))
+		amount_row.add_child(toggle)
+
+	var entries := [
+		{"id": "small", "label": "Small Meteor"},
+		{"id": "normal", "label": "Meteor"},
+		{"id": "heavy", "label": "Heavy Meteor"},
+		{"id": "ufo", "label": "UFO Ship"},
+		{"id": "rocketeer", "label": "Rocketeer Ship"},
+		{"id": "boss", "label": "Boss"}
+	]
+	for entry in entries:
+		var btn := Button.new()
+		btn.text = String(entry["label"])
+		btn.add_theme_font_size_override("font_size", 13)
+		btn.custom_minimum_size = Vector2(128, 30)
+		btn.pressed.connect(_on_sandbox_spawn_pressed.bind(String(entry["id"])))
+		box.add_child(btn)
+
+	var hint := Label.new()
+	hint.text = "Click a tower to\ntoggle it on/off"
+	hint.add_theme_font_size_override("font_size", 11)
+	hint.modulate = Color(0.7, 0.8, 0.85)
+	box.add_child(hint)
+
+func _on_sandbox_amount_toggled(pressed: bool, amount: int) -> void:
+	if pressed:
+		sandbox_spawn_amount = amount
+
+func _on_sandbox_spawn_pressed(id: String) -> void:
+	if wave_manager:
+		wave_manager.spawn_sandbox_enemy(id, sandbox_spawn_amount)
 
 func _can_toggle_pause() -> bool:
 	if game_over:

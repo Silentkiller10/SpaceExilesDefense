@@ -39,6 +39,8 @@ var rampart_y: float = 560.0
 var afk_timer: float = 0.0
 @export var afk_delay: float = 0.0
 var is_afk: bool = false
+## Sandbox: no auto-aim/auto-fire — only shoots while click/hold on "shot"
+var manual_fire_only: bool = false
 
 @onready var body_lr: Node2D = $BodyLR
 @onready var body_rotate: Node2D = $BodyRotate
@@ -60,6 +62,11 @@ var base_fire_interval: float = 0.9
 const CharacterVisualScript = preload("res://scripts/character_visual.gd")
 
 var _body_anim: AnimatedSprite2D
+## Kneeling fire poses keyed by aim direction ({center, left: [...], right: [...]})
+var _fire_poses: Dictionary = {}
+var _fire_pose_sprite: Sprite2D
+## True on frames where the character is actively aiming/firing
+var _wants_fire_pose: bool = false
 
 func _ready():
 	if health_bar:
@@ -68,6 +75,15 @@ func _ready():
 	if shot_timer:
 		base_fire_interval = shot_timer.wait_time
 	_body_anim = CharacterVisualScript.build_sprite_body(body_lr)
+	_fire_poses = CharacterVisualScript.load_fire_poses()
+	if not _fire_poses.is_empty():
+		_fire_pose_sprite = Sprite2D.new()
+		_fire_pose_sprite.name = "FirePose"
+		_fire_pose_sprite.z_index = 1
+		_fire_pose_sprite.visible = false
+		var ps: float = CharacterVisualScript.FIRE_POSE_SCALE
+		_fire_pose_sprite.scale = Vector2(ps, ps)
+		body_lr.add_child(_fire_pose_sprite)
 	body_rotate.scale = Vector2(CharacterVisualScript.COMBAT_SCALE, CharacterVisualScript.COMBAT_SCALE)
 	var muzzle_x: float = CharacterVisualScript.SPRITE_MUZZLE_X
 	bullet_spawn_pos.position = Vector2(muzzle_x, 0.0)
@@ -98,7 +114,7 @@ func _physics_process(delta):
 		or Input.is_action_pressed("move_down")
 		or Input.is_action_just_pressed("shock_wave")
 	)
-	if has_input:
+	if has_input or manual_fire_only:
 		_reset_afk()
 	else:
 		afk_timer += delta
@@ -109,13 +125,16 @@ func _physics_process(delta):
 		var target: Node2D = _find_closest_enemy()
 		if target != null:
 			_aim_at(target.global_position)
+			_wants_fire_pose = true
 			if not is_shot_cd:
 				_try_shoot()
 		else:
+			_wants_fire_pose = false
 			body_rotate.rotation = -PI / 2.0
 	else:
 		_aim_upward_cone()
-		if Input.is_action_pressed("shot") and not is_shot_cd:
+		_wants_fire_pose = Input.is_action_pressed("shot")
+		if _wants_fire_pose and not is_shot_cd:
 			_try_shoot()
 
 	if has_contact_pulse and Input.is_action_just_pressed("shock_wave") and not is_pulse_cd:
@@ -126,6 +145,7 @@ func _physics_process(delta):
 		move_trail_effect.emitting = true
 
 	update_body_lr()
+	_update_fire_pose()
 	move_and_slide()
 
 	position.y = rampart_y
@@ -223,6 +243,46 @@ func update_body_lr():
 		_body_anim.speed_scale = 1.0
 		if _body_anim.animation != "idle":
 			_body_anim.play("idle")
+
+## Swap the walk/idle body for a kneeling firing pose picked by aim angle
+## (mouse direction when aiming manually, target direction when auto-aiming).
+func _update_fire_pose() -> void:
+	if _fire_pose_sprite == null:
+		return
+	# Walking cancels the kneel — the walk animation takes over
+	var show_pose: bool = _wants_fire_pose and absf(velocity.x) <= 0.01
+	if not show_pose:
+		_fire_pose_sprite.visible = false
+		if _body_anim:
+			_body_anim.visible = true
+		return
+
+	# Degrees away from straight up: positive = right, negative = left
+	var dev: float = rad_to_deg(wrapf(body_rotate.rotation + PI / 2.0, -PI, PI))
+	var tex: Texture2D
+	var ad: float = absf(dev)
+	if ad < 8.0:
+		tex = _fire_poses["center"]
+	else:
+		# Files are named 1 (most horizontal) .. 4 (almost vertical)
+		var idx: int
+		if ad < 22.0:
+			idx = 3
+		elif ad < 36.0:
+			idx = 2
+		elif ad < 50.0:
+			idx = 1
+		else:
+			idx = 0
+		tex = _fire_poses["right"][idx] if dev > 0.0 else _fire_poses["left"][idx]
+
+	var ps: float = CharacterVisualScript.FIRE_POSE_SCALE
+	_fire_pose_sprite.texture = tex
+	# Keep every pose's feet on the same ground line as the walk sprite
+	_fire_pose_sprite.position = Vector2(0.0, CharacterVisualScript.FIRE_POSE_FEET_Y - tex.get_height() * ps * 0.5)
+	_fire_pose_sprite.visible = true
+	if _body_anim:
+		_body_anim.visible = false
 
 func shoot():
 	body_rotete_player.play("Shot")

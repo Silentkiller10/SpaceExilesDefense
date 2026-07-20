@@ -97,10 +97,10 @@ func _build_ui() -> void:
 	vbox.add_child(_play_btn)
 
 	var test_btn = Button.new()
-	test_btn.text = "Tower Test Range"
+	test_btn.text = "Sandbox"
 	test_btn.custom_minimum_size = Vector2(240, 44)
 	test_btn.modulate = Color(0.55, 1.0, 0.85)
-	test_btn.tooltip_text = "All towers unlocked, endless waves, no rewards"
+	test_btn.tooltip_text = "All towers unlocked. Pick which enemies spawn, click towers to toggle them, manual fire only"
 	test_btn.pressed.connect(_on_test_range_pressed)
 	vbox.add_child(test_btn)
 

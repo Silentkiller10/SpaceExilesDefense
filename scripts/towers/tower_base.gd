@@ -11,6 +11,8 @@ class_name TowerBase
 var fortress: Node2D
 var cd_left: float = 0.0
 var unlocked: bool = false
+## Sandbox only: tower stays visible but stops firing (toggled by clicking it)
+var sandbox_disabled: bool = false
 var body: Polygon2D
 var label: Label
 var range_hint: Polygon2D
@@ -50,6 +52,13 @@ func unlock() -> void:
 func is_unlocked() -> bool:
 	return unlocked
 
+func toggle_sandbox_disabled() -> void:
+	set_sandbox_disabled(not sandbox_disabled)
+
+func set_sandbox_disabled(disabled: bool) -> void:
+	sandbox_disabled = disabled
+	modulate = Color(0.45, 0.5, 0.55, 0.45) if disabled else Color.WHITE
+
 func apply_local_damage_mult(mult_add: float) -> void:
 	local_damage_mult *= (1.0 + mult_add)
 
@@ -88,7 +97,7 @@ func _build_visual() -> void:
 	add_child(label)
 
 func _process(delta: float) -> void:
-	if not unlocked:
+	if not unlocked or sandbox_disabled:
 		return
 	cd_left -= delta
 	if cd_left > 0.0:

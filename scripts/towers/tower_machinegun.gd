@@ -79,7 +79,7 @@ func _build_visual() -> void:
 	_pivot.rotation = -PI / 2.0
 
 func _process(delta: float) -> void:
-	if not unlocked:
+	if not unlocked or sandbox_disabled:
 		return
 	_idle_t += delta
 	_spin = move_toward(_spin, 0.0, delta * 20.0)
