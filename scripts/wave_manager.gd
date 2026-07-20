@@ -113,19 +113,19 @@ func _spawn_creep() -> void:
 	var x := rng.randf_range(60.0, arena_width - 60.0)
 	var y := spawn_y + rng.randf_range(-20.0, 40.0)
 
-	var meteor: Dictionary = enemy.pick_meteor_type(rng) if enemy.has_method("pick_meteor_type") else {}
+	var etype: Dictionary = enemy.pick_enemy_type(rng) if enemy.has_method("pick_enemy_type") else {}
 	var hp: int
 	var spd: float
-	if not meteor.is_empty():
-		hp = int((float(meteor["base_hp"]) + float(wave) * float(meteor["hp_per_wave"])) * _stage_hp_mult())
-		spd = (float(meteor["base_speed"]) + float(wave) * float(meteor["speed_per_wave"])) * _stage_speed_mult() * _meteor_slow_mult()
+	if not etype.is_empty():
+		hp = int((float(etype["base_hp"]) + float(wave) * float(etype["hp_per_wave"])) * _stage_hp_mult())
+		spd = (float(etype["base_speed"]) + float(wave) * float(etype["speed_per_wave"])) * _stage_speed_mult() * _meteor_slow_mult()
 	else:
 		hp = int((180 + wave * 35) * _stage_hp_mult())
 		spd = (32.0 + wave * 1.5) * _stage_speed_mult() * _meteor_slow_mult()
 
 	get_tree().current_scene.add_child(enemy)
-	if enemy.has_method("apply_meteor_type") and not meteor.is_empty():
-		enemy.apply_meteor_type(meteor)
+	if enemy.has_method("apply_enemy_type") and not etype.is_empty():
+		enemy.apply_enemy_type(etype)
 	enemy.setup_descent(Vector2(x, y), player, fortress, hp, spd)
 	enemy.connect("enemy_destroyed", _on_enemy_destroyed)
 	active_enemies.append(enemy)
@@ -138,8 +138,8 @@ func _spawn_boss() -> void:
 	var boss = scene.instantiate()
 	var x := arena_width * 0.5
 	var heavy: Dictionary = {}
-	if boss.has_method("get_meteor_type"):
-		heavy = boss.get_meteor_type("heavy")
+	if boss.has_method("get_enemy_type"):
+		heavy = boss.get_enemy_type("heavy")
 	# Mega boss on boss stages: much tougher, slightly slower descent
 	var hp_mult := 25.0 if _is_boss_stage() else 10.0
 	var spd_mult := 0.45 if _is_boss_stage() else 0.55

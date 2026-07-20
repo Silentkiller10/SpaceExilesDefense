@@ -1,10 +1,13 @@
 extends CharacterBody2D
 signal enemy_destroyed(enemy)
 
-## Three meteor variants — small (fast/fragile), normal (balanced), heavy (tanky/slow).
-const METEOR_TYPES := [
+## Enemy roster. Each entry has a "category" that drives visuals/behavior:
+##   "meteor" — falls with a fire trail and heat shimmer
+##   "ship"   — descends with a cool engine glow, no flames
+const ENEMY_TYPES := [
 	{
 		"id": "small",
+		"category": "meteor",
 		"texture": "res://assets/png/small meteor.png",
 		"base_hp": 90,
 		"hp_per_wave": 22,
@@ -16,6 +19,7 @@ const METEOR_TYPES := [
 	},
 	{
 		"id": "normal",
+		"category": "meteor",
 		"texture": "res://assets/png/normal meteor.png",
 		"base_hp": 180,
 		"hp_per_wave": 35,
@@ -27,6 +31,7 @@ const METEOR_TYPES := [
 	},
 	{
 		"id": "heavy",
+		"category": "meteor",
 		"texture": "res://assets/png/normal meteor 2.png",
 		"base_hp": 320,
 		"hp_per_wave": 55,
@@ -35,6 +40,21 @@ const METEOR_TYPES := [
 		"sprite_scale": 0.16,
 		"collision": Vector2(48, 48),
 		"weight": 0.85
+	},
+	{
+		"id": "ufo",
+		"category": "ship",
+		"texture": "res://assets/sprites/spaceship_1.png",
+		# The source PNG has a fake checkerboard "transparency" baked into its
+		# pixels — strip it at load time until the asset itself is fixed.
+		"strip_background": true,
+		"base_hp": 140,
+		"hp_per_wave": 30,
+		"base_speed": 58.0,
+		"speed_per_wave": 1.8,
+		"sprite_scale": 0.06,
+		"collision": Vector2(44, 44),
+		"weight": 0.9
 	},
 ]
 
@@ -49,11 +69,13 @@ var stun_timer: float = 0.0
 var burn_timer: float = 0.0
 var burn_dps: float = 0.0
 var pull_force: Vector2 = Vector2.ZERO
-var meteor_id: String = "normal"
+var type_id: String = "normal"
+var category: String = "meteor"
 var _spawn_x: float = 0.0
 var _base_sprite_scale: Vector2 = Vector2.ONE
 var _fall_trail: GPUParticles2D
 var _ember_trail: GPUParticles2D
+var _trail_category: String = ""
 var _fall_time: float = 0.0
 
 @onready var animation_tree: AnimationTree = $AnimationTree
@@ -64,23 +86,73 @@ var _fall_time: float = 0.0
 @onready var sprite: Sprite2D = $Enemy2D
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
 
-static func pick_meteor_type(rng: RandomNumberGenerator) -> Dictionary:
+static func pick_enemy_type(rng: RandomNumberGenerator) -> Dictionary:
 	var total := 0.0
-	for t in METEOR_TYPES:
+	for t in ENEMY_TYPES:
 		total += float(t["weight"])
 	var roll := rng.randf() * total
 	var acc := 0.0
-	for t in METEOR_TYPES:
+	for t in ENEMY_TYPES:
 		acc += float(t["weight"])
 		if roll <= acc:
 			return t
-	return METEOR_TYPES[1]
+	return ENEMY_TYPES[1]
 
-static func get_meteor_type(id: String) -> Dictionary:
-	for t in METEOR_TYPES:
+static func get_enemy_type(id: String) -> Dictionary:
+	for t in ENEMY_TYPES:
 		if String(t["id"]) == id:
 			return t
-	return METEOR_TYPES[1]
+	return ENEMY_TYPES[1]
+
+## Cache of textures that had their fake checkerboard background removed.
+static var _clean_texture_cache := {}
+
+## Removes a baked-in checkerboard/white background by flood-filling from the
+## image borders and zeroing the alpha of every light, colorless pixel reached.
+## Interior highlights survive because the fill can't cross the sprite outline.
+static func _load_texture_without_background(path: String) -> Texture2D:
+	if _clean_texture_cache.has(path):
+		return _clean_texture_cache[path]
+	var tex: Texture2D = load(path)
+	if tex == null:
+		return null
+	var img: Image = tex.get_image()
+	if img == null:
+		return tex
+	img.convert(Image.FORMAT_RGBA8)
+	var w := img.get_width()
+	var h := img.get_height()
+	var visited := PackedByteArray()
+	visited.resize(w * h)
+	var stack: Array[Vector2i] = []
+	for x in range(w):
+		stack.append(Vector2i(x, 0))
+		stack.append(Vector2i(x, h - 1))
+	for y in range(h):
+		stack.append(Vector2i(0, y))
+		stack.append(Vector2i(w - 1, y))
+	while not stack.is_empty():
+		var p: Vector2i = stack.pop_back()
+		if p.x < 0 or p.y < 0 or p.x >= w or p.y >= h:
+			continue
+		var idx := p.y * w + p.x
+		if visited[idx] == 1:
+			continue
+		visited[idx] = 1
+		var c := img.get_pixelv(p)
+		var lo: float = minf(c.r, minf(c.g, c.b))
+		var hi: float = maxf(c.r, maxf(c.g, c.b))
+		var is_background := c.a < 0.1 or (lo >= 0.62 and (hi - lo) <= 0.14)
+		if not is_background:
+			continue
+		img.set_pixelv(p, Color(c.r, c.g, c.b, 0.0))
+		stack.append(Vector2i(p.x + 1, p.y))
+		stack.append(Vector2i(p.x - 1, p.y))
+		stack.append(Vector2i(p.x, p.y + 1))
+		stack.append(Vector2i(p.x, p.y - 1))
+	var clean := ImageTexture.create_from_image(img)
+	_clean_texture_cache[path] = clean
+	return clean
 
 func _ready():
 	damage_text.visible = false
@@ -109,22 +181,30 @@ func setup_descent(pos: Vector2, _player: CharacterBody2D, _fortress: Node2D, hp
 		health_bar.value = health
 	_ensure_fall_vfx()
 
-func apply_meteor_type(type: Dictionary) -> void:
-	meteor_id = String(type.get("id", "normal"))
+func apply_enemy_type(type: Dictionary) -> void:
+	type_id = String(type.get("id", "normal"))
+	category = String(type.get("category", "meteor"))
 	if sprite == null:
 		sprite = get_node_or_null("Enemy2D") as Sprite2D
 	if sprite:
 		var path := String(type.get("texture", ""))
 		if path != "" and ResourceLoader.exists(path):
-			sprite.texture = load(path)
+			if bool(type.get("strip_background", false)):
+				sprite.texture = _load_texture_without_background(path)
+			else:
+				sprite.texture = load(path)
 		var s := float(type.get("sprite_scale", 0.12))
 		_base_sprite_scale = Vector2(s, s)
 		sprite.scale = _base_sprite_scale
 		sprite.rotation = 0.0
-		# Rocky core near collision center; flame trails upward
-		var tex: Texture2D = sprite.texture
-		if tex:
-			sprite.offset = Vector2(0, tex.get_height() * 0.18)
+		sprite.modulate = Color.WHITE
+		if category == "meteor":
+			# Rocky core near collision center; flame trails upward
+			var tex: Texture2D = sprite.texture
+			if tex:
+				sprite.offset = Vector2(0, tex.get_height() * 0.18)
+		else:
+			sprite.offset = Vector2.ZERO
 	if collision_shape == null:
 		collision_shape = get_node_or_null("CollisionShape2D") as CollisionShape2D
 	if collision_shape and collision_shape.shape is RectangleShape2D:
@@ -137,7 +217,7 @@ func apply_meteor_type(type: Dictionary) -> void:
 func set_as_boss(value: bool) -> void:
 	is_boss = value
 	if value:
-		apply_meteor_type(get_meteor_type("heavy"))
+		apply_enemy_type(get_enemy_type("heavy"))
 		scale = Vector2(2.4, 2.4)
 
 func apply_stun(duration: float) -> void:
@@ -152,7 +232,41 @@ func apply_pull(force: Vector2) -> void:
 	pull_force.y += force.y
 
 func _ensure_fall_vfx() -> void:
+	# Rebuild trails if the category changed since they were created
 	if _fall_trail != null and is_instance_valid(_fall_trail):
+		if _trail_category == category:
+			_update_trail_intensity()
+			return
+		_fall_trail.queue_free()
+		_fall_trail = null
+		if _ember_trail and is_instance_valid(_ember_trail):
+			_ember_trail.queue_free()
+		_ember_trail = null
+	_trail_category = category
+
+	if category == "ship":
+		# Cool cyan engine wash — no flames on ships
+		_fall_trail = _make_trail_particles(
+			14,
+			Color(0.45, 0.85, 1.0, 0.85),
+			Color(0.15, 0.35, 1.0, 0.0),
+			1.8,
+			5.0,
+			0.45
+		)
+		_fall_trail.z_index = -1
+		add_child(_fall_trail)
+
+		_ember_trail = _make_trail_particles(
+			8,
+			Color(0.85, 0.98, 1.0, 1.0),
+			Color(0.3, 0.6, 1.0, 0.0),
+			0.9,
+			2.4,
+			0.32
+		)
+		_ember_trail.z_index = -1
+		add_child(_ember_trail)
 		_update_trail_intensity()
 		return
 
@@ -260,6 +374,14 @@ func _physics_process(delta):
 
 func _update_fall_visual() -> void:
 	if sprite == null or not is_instance_valid(sprite):
+		return
+	if category == "ship":
+		# Ships hover: slow spin + gentle pulse, no heat tint
+		var pulse: float = 1.0 + sin(_fall_time * 4.0) * 0.03
+		sprite.scale = _base_sprite_scale * pulse
+		sprite.rotation = _fall_time * 0.8
+		if sprite.modulate.a >= 0.99:
+			sprite.modulate = Color.WHITE
 		return
 	# Flame stays upright; stretch + heat shimmer sell the fall
 	var stretch: float = 1.0 + clampf(speed / 220.0, 0.0, 0.2)

@@ -7,6 +7,7 @@
 
 # Editor temp files
 *.tmp
+*~
 
 # Exports
 export.cfg
@@ -19,10 +20,12 @@ android/build/build/
 android/build/.gradle/
 android/build/libs/
 
-# Mono-specific ignores
+# Mono / .NET
 .mono/
 data_*/
+mono_crash.*
 
 # OS junk
 Thumbs.db
+Desktop.ini
 .DS_Store

@@ -3,7 +3,8 @@ extends Area2D
 ## Machine gun tower projectile — fast sprite bullet.
 
 const TEX_PATH: String = "res://assets/sprites/machine_gun_bullet.png"
-const BULLET_SCALE := Vector2(0.32, 0.32)
+# Match player bullet on-screen size (~0.1 on a ~350px sprite → ~35px wide).
+const BULLET_SCALE := Vector2(0.04, 0.04)
 
 @export var speed: float = 2600.0
 
@@ -30,7 +31,7 @@ func _ready() -> void:
 
 	var shape_node := CollisionShape2D.new()
 	var rect := RectangleShape2D.new()
-	rect.size = Vector2(40, 14)
+	rect.size = Vector2(18, 8)
 	shape_node.shape = rect
 	add_child(shape_node)
 
