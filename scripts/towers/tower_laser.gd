@@ -5,11 +5,12 @@ extends "res://scripts/towers/tower_base.gd"
 const V := preload("res://scripts/towers/tower_visuals.gd")
 const TEX_BASE := preload("res://assets/png/towers/laser_base.png")
 const TEX_HEAD_PATH := "res://assets/png/towers/laser_head.png"
+const SFX_LASER_PATH := "res://assets/sound_effects/tower_laser.wav"
 
 const CORE := Color(0.35, 1.0, 0.55)
 const HOT := Color(0.85, 1.0, 0.35)
 
-const TOWER_SCALE := 0.72
+const TOWER_SCALE := 0.792
 const BASE_SCALE := 0.36 * TOWER_SCALE
 const HEAD_SCALE := 0.28 * TOWER_SCALE
 const AIM_SPEED := 16.0
@@ -39,6 +40,9 @@ var _beam_tween: Tween
 var _idle_t: float = 0.0
 var _charge: float = 0.0
 var _recoil: float = 0.0
+var _sfx_player: AudioStreamPlayer
+var _sfx_cd: float = 0.0
+const SFX_INTERVAL := 0.12
 
 func _ready() -> void:
 	configure("laser", "Laser", Color(1.0, 0.25, 0.55), 560.0, 0.04, 18)
@@ -104,6 +108,7 @@ func _process(delta: float) -> void:
 	if not unlocked or sandbox_disabled:
 		return
 	_idle_t += delta
+	_sfx_cd = maxf(0.0, _sfx_cd - delta)
 	_recoil = move_toward(_recoil, 0.0, delta * 85.0)
 	_charge = move_toward(_charge, 0.0, delta * 3.5)
 	var pulse: float = 0.5 + 0.5 * sin(_idle_t * 5.5)
@@ -158,3 +163,20 @@ func _fire(target: Node2D) -> void:
 	)
 	V.muzzle_sparks(_muzzle, CORE, HOT)
 	V.impact_burst(self, to_l, CORE, HOT)
+	_play_laser_sfx()
+
+func _play_laser_sfx() -> void:
+	if _sfx_cd > 0.0:
+		return
+	_sfx_cd = SFX_INTERVAL
+	if _sfx_player == null:
+		var stream: AudioStream = load(SFX_LASER_PATH) as AudioStream
+		if stream == null:
+			return
+		_sfx_player = AudioStreamPlayer.new()
+		_sfx_player.stream = stream
+		_sfx_player.bus = "Towers"
+		_sfx_player.volume_db = -10.0
+		add_child(_sfx_player)
+	_sfx_player.pitch_scale = randf_range(0.96, 1.06)
+	_sfx_player.play()

@@ -116,6 +116,7 @@ one_shot = true
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=293085978]
 stream = ExtResource("3_qiobg")
 volume_db = -12.0
+bus = &"Player"
 
 [node name="ProgressBar" type="ProgressBar" parent="." unique_id=1553310526]
 visible = false

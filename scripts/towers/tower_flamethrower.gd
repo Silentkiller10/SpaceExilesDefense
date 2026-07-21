@@ -10,7 +10,7 @@ const CORE := Color(1.0, 0.45, 0.1)
 const HOT := Color(1.0, 0.75, 0.15)
 const CORE_INNER := Color(1.0, 0.95, 0.35)
 
-const TOWER_SCALE := 0.72
+const TOWER_SCALE := 0.792
 ## Base/head art is 1000x1000 (head points along +X).
 const BASE_SCALE := 0.154 * TOWER_SCALE
 const HEAD_SCALE := 0.14 * TOWER_SCALE

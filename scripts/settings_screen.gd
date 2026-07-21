@@ -2,8 +2,6 @@ extends Control
 
 var _section_title: Label
 var _content_box: VBoxContainer
-var _volume_slider: HBoxContainer
-var _volume_value: Label
 var _sfx_toggle: CheckButton
 var _fullscreen_toggle: CheckButton
 var _vsync_toggle: CheckButton
@@ -106,30 +104,41 @@ func _show_section(section: int) -> void:
 			_build_player_section()
 
 func _build_sounds_section() -> void:
-	_content_box.add_child(_make_row_label("Master volume"))
+	_make_volume_row("Master", GameSettings.master_volume, func(v: float): GameSettings.set_master_volume(v))
+	_make_volume_row("Music", GameSettings.music_volume, func(v: float): GameSettings.set_music_volume(v))
+	_make_volume_row("Player", GameSettings.player_volume, func(v: float): GameSettings.set_player_volume(v))
+	_make_volume_row("Enemy", GameSettings.enemy_volume, func(v: float): GameSettings.set_enemy_volume(v))
+	_make_volume_row("Towers", GameSettings.towers_volume, func(v: float): GameSettings.set_towers_volume(v))
 
-	_volume_slider = HBoxContainer.new()
-	_volume_slider.add_theme_constant_override("separation", 10)
-	_content_box.add_child(_volume_slider)
+	_sfx_toggle = _make_toggle_row(
+		"Sound effects",
+		GameSettings.sfx_enabled,
+		func(on: bool): GameSettings.set_sfx_enabled(on)
+	)
+
+func _make_volume_row(label_text: String, initial: float, callback: Callable) -> void:
+	_content_box.add_child(_make_row_label(label_text))
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	_content_box.add_child(row)
 
 	var slider := HSlider.new()
 	slider.min_value = 0.0
 	slider.max_value = 100.0
 	slider.step = 1.0
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	slider.value = GameSettings.master_volume * 100.0
-	slider.value_changed.connect(_on_volume_changed)
-	_volume_slider.add_child(slider)
+	slider.value = initial * 100.0
+	row.add_child(slider)
 
-	_volume_value = Label.new()
-	_volume_value.custom_minimum_size = Vector2(48, 0)
-	_volume_value.text = "%d%%" % int(slider.value)
-	_volume_slider.add_child(_volume_value)
+	var value_lbl := Label.new()
+	value_lbl.custom_minimum_size = Vector2(48, 0)
+	value_lbl.text = "%d%%" % int(slider.value)
+	row.add_child(value_lbl)
 
-	_sfx_toggle = _make_toggle_row(
-		"Sound effects",
-		GameSettings.sfx_enabled,
-		func(on: bool): GameSettings.set_sfx_enabled(on)
+	slider.value_changed.connect(func(value: float):
+		value_lbl.text = "%d%%" % int(value)
+		callback.call(value / 100.0)
 	)
 
 func _build_graphics_section() -> void:
@@ -190,8 +199,3 @@ func _make_toggle_row(label_text: String, initial_on: bool, callback: Callable) 
 	)
 	row.add_child(toggle)
 	return toggle
-
-func _on_volume_changed(value: float) -> void:
-	if _volume_value:
-		_volume_value.text = "%d%%" % int(value)
-	GameSettings.set_master_volume(value / 100.0)

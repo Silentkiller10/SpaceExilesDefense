@@ -10,7 +10,7 @@ const TEX_HEAD_PATH := "res://assets/sprites/machine_gun_head.png"
 const CORE := Color(0.35, 0.95, 1.0)
 const HOT := Color(0.85, 1.0, 0.35)
 
-const TOWER_SCALE := 0.72
+const TOWER_SCALE := 0.792
 const BASE_SCALE := 0.36 * TOWER_SCALE
 const HEAD_SCALE := 0.28 * TOWER_SCALE
 const AIM_SPEED := 16.0

@@ -27,5 +27,6 @@ shape = SubResource("RectangleShape2D_3d8s6")
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=823623525]
 stream = ExtResource("2_fwpsb")
 volume_db = -12.0
+bus = &"Player"
 
 [connection signal="body_entered" from="." to="." method="_on_body_entered"]

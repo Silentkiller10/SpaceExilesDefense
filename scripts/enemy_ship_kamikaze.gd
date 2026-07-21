@@ -8,6 +8,8 @@ extends "res://scripts/enemy.gd"
 ## stunning the player for 1 second.
 
 const ORB_SCRIPT := preload("res://scripts/enemy_ship_kamikaze_orb.gd")
+const SFX_SPAWN_PATH := "res://assets/sound_effects/kamikaze_spawn.wav"
+const SFX_DEATH_PATH := "res://assets/sound_effects/kamikaze_death.wav"
 
 const SHIP_TYPE := {
 	"id": "kamikaze",
@@ -69,6 +71,7 @@ func setup_kamikaze(orb_hp: int, explode_damage: int) -> void:
 		orb.setup(self, orb_hp)
 		_orbs.append(orb)
 	_place_orbs()
+	_play_sfx(SFX_SPAWN_PATH, false)
 
 func _physics_process(delta):
 	if is_dying:
@@ -237,6 +240,7 @@ func _explode_on_base() -> void:
 		fortress.take_damage(maxi(1, int(round(float(boom_damage) * mult))))
 	if player and is_instance_valid(player) and player.has_method("apply_stun"):
 		player.apply_stun(STUN_DURATION)
+	_play_sfx(SFX_DEATH_PATH, true)
 	_spawn_boom_fx()
 	queue_free()
 
@@ -281,4 +285,23 @@ func die():
 	for orb in _orbs:
 		if is_instance_valid(orb):
 			orb.is_dying = true
+	_play_sfx(SFX_DEATH_PATH, true)
 	super()
+
+func _play_sfx(path: String, detach: bool) -> void:
+	var stream: AudioStream = load(path) as AudioStream
+	if stream == null:
+		return
+	var player := AudioStreamPlayer.new()
+	player.stream = stream
+	player.bus = "Enemy"
+	player.volume_db = -4.0
+	var host: Node = self
+	if detach:
+		var scene := get_tree().current_scene if is_inside_tree() else null
+		if scene == null:
+			return
+		host = scene
+	host.add_child(player)
+	player.finished.connect(player.queue_free)
+	player.play()

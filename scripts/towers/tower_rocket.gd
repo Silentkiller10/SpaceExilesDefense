@@ -5,11 +5,12 @@ extends "res://scripts/towers/tower_base.gd"
 const V := preload("res://scripts/towers/tower_visuals.gd")
 const ROCKET_SCENE := preload("res://scenes/towers/tower_rocket_projectile.tscn")
 const TEX_PATH := "res://assets/png/towers/rocket_launcher.png"
+const SFX_LAUNCH_PATH := "res://assets/sound_effects/rocket_launch.wav"
 
 const CORE := Color(0.4, 0.75, 1.0)
 const HOT := Color(0.7, 0.9, 1.0)
 
-const TOWER_SCALE := 0.72
+const TOWER_SCALE := 0.792
 ## Art is 841x1024, barrels point straight up.
 const SPRITE_SCALE := 0.132 * TOWER_SCALE
 const NATURAL_ANGLE := -PI / 2.0
@@ -99,4 +100,18 @@ func _fire(target: Node2D) -> void:
 	world.add_child(rocket)
 	if rocket.has_method("launch"):
 		rocket.launch(origin, direction, target, _scaled_damage(), BLAST_RADIUS * _aoe_mult, range_px * 1.2)
+	_play_launch_sfx()
 	V.muzzle_sparks(_muzzle, CORE, HOT, 5)
+
+func _play_launch_sfx() -> void:
+	var stream: AudioStream = load(SFX_LAUNCH_PATH) as AudioStream
+	if stream == null:
+		return
+	var player := AudioStreamPlayer.new()
+	player.stream = stream
+	player.bus = "Towers"
+	player.volume_db = -6.0
+	player.pitch_scale = randf_range(0.92, 1.08)
+	add_child(player)
+	player.finished.connect(player.queue_free)
+	player.play()

@@ -3,6 +3,7 @@ extends Area2D
 ## Rocket launcher projectile — guided rocket, explodes with AoE on impact.
 
 const TEX_PATH: String = "res://assets/png/towers/rocket_projectile.png"
+const SFX_HIT_PATH: String = "res://assets/sound_effects/rocket_hit.wav"
 ## Art is 948x225, points right; ~42px long on screen.
 const ROCKET_SCALE := Vector2(0.045, 0.045)
 
@@ -130,12 +131,28 @@ func _explode() -> void:
 		elif enemy.has_method("get_hit"):
 			enemy.get_hit(damage, global_transform, 80.0)
 	_spawn_blast_fx()
+	_play_hit_sfx()
 	if _sprite:
 		_sprite.visible = false
 	# Keep the node alive briefly so blast tweens finish, then free.
 	var tw := create_tween()
 	tw.tween_interval(0.4)
 	tw.tween_callback(queue_free)
+
+func _play_hit_sfx() -> void:
+	var stream: AudioStream = load(SFX_HIT_PATH) as AudioStream
+	if stream == null:
+		return
+	# Play on the scene root so the sound isn't cut if this rocket frees early
+	var host: Node = get_tree().current_scene if get_tree() else self
+	var player := AudioStreamPlayer.new()
+	player.stream = stream
+	player.bus = "Towers"
+	player.volume_db = -4.0
+	player.pitch_scale = randf_range(0.94, 1.06)
+	host.add_child(player)
+	player.finished.connect(player.queue_free)
+	player.play()
 
 func _spawn_blast_fx() -> void:
 	var core := Polygon2D.new()
