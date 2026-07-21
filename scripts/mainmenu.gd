@@ -1,171 +1,247 @@
 extends Control
 
-var _stage_label: Label
-var _reward_preview: Label
 var _play_btn: Button
+var _normal_btn: Button
+var _infinity_btn: Button
+var _sandbox_btn: Button
+var _char_btn: Button
+var _skill_btn: Button
+var _leaderboard_box: VBoxContainer
+var _mode_panel: VBoxContainer
+var _hub_panel: VBoxContainer
+var _leaderboard_panel: PanelContainer
+var _leaderboard_btn: Button
 
-func _ready():
-	PlayerData.clamp_selected_stage()
-	_build_ui()
-
-func _build_ui() -> void:
-	for c in get_children():
-		c.queue_free()
-
-	var bg = ColorRect.new()
-	bg.color = Color(0.03, 0.04, 0.08)
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+func _ready() -> void:
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	var bg := ColorRect.new()
+	bg.color = Color(0.04, 0.05, 0.09, 1.0)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
-	var glow = ColorRect.new()
-	glow.color = Color(0.1, 0.45, 0.7, 0.15)
-	glow.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(glow)
+	var root := HBoxContainer.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_theme_constant_override("separation", 24)
+	root.set("theme_override_constants/margin_left", 32)
+	root.set("theme_override_constants/margin_right", 32)
+	root.set("theme_override_constants/margin_top", 28)
+	root.set("theme_override_constants/margin_bottom", 28)
+	add_child(root)
 
-	var center = CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
+	var left := VBoxContainer.new()
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left.add_theme_constant_override("separation", 10)
+	root.add_child(left)
 
-	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(360, 420)
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.06, 0.08, 0.12, 0.95)
-	style.border_color = Color(0.25, 0.85, 1.0)
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(10)
-	panel.add_theme_stylebox_override("panel", style)
-	center.add_child(panel)
+	var title := Label.new()
+	title.text = "SPACE EXILES DEFENSE"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 28)
+	title.modulate = Color(0.35, 0.95, 0.85)
+	left.add_child(title)
 
-	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 12)
-	panel.add_child(vbox)
-
-	var brand = Label.new()
-	brand.text = "FORTRESS TD"
-	brand.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	brand.add_theme_font_size_override("font_size", 32)
-	brand.modulate = Color(0.35, 0.9, 1.0)
-	vbox.add_child(brand)
-
-	var subtitle = Label.new()
-	subtitle.text = "Hub — pick a stage, gear up, deploy"
+	var subtitle := Label.new()
+	subtitle.text = "Fortress Command Hub"
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	subtitle.add_theme_font_size_override("font_size", 13)
-	vbox.add_child(subtitle)
+	subtitle.add_theme_font_size_override("font_size", 14)
+	subtitle.modulate = Color(0.65, 0.75, 0.85)
+	left.add_child(subtitle)
 
-	var stats = Label.new()
-	stats.text = "Coins: %d  |  Newest: Stage %d  |  Cleared: %d" % [
-		PlayerData.coins, PlayerData.current_stage, PlayerData.levels_cleared
-	]
-	stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	stats.add_theme_font_size_override("font_size", 12)
-	vbox.add_child(stats)
+	left.add_child(_spacer(12))
 
-	# Stage picker
-	var picker := HBoxContainer.new()
-	picker.alignment = BoxContainer.ALIGNMENT_CENTER
-	picker.add_theme_constant_override("separation", 12)
-	vbox.add_child(picker)
-
-	var prev_btn := Button.new()
-	prev_btn.text = "<"
-	prev_btn.custom_minimum_size = Vector2(48, 40)
-	prev_btn.pressed.connect(_change_stage.bind(-1))
-	picker.add_child(prev_btn)
-
-	_stage_label = Label.new()
-	_stage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_stage_label.custom_minimum_size = Vector2(160, 0)
-	_stage_label.add_theme_font_size_override("font_size", 18)
-	picker.add_child(_stage_label)
-
-	var next_btn := Button.new()
-	next_btn.text = ">"
-	next_btn.custom_minimum_size = Vector2(48, 40)
-	next_btn.pressed.connect(_change_stage.bind(1))
-	picker.add_child(next_btn)
-
-	_reward_preview = Label.new()
-	_reward_preview.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_reward_preview.add_theme_font_size_override("font_size", 12)
-	_reward_preview.modulate = Color(1.0, 0.85, 0.35)
-	vbox.add_child(_reward_preview)
-
-	_play_btn = Button.new()
-	_play_btn.custom_minimum_size = Vector2(240, 44)
+	_play_btn = _make_btn("PLAY", Color(0.35, 0.95, 0.7))
+	_play_btn.custom_minimum_size = Vector2(280, 52)
+	_play_btn.add_theme_font_size_override("font_size", 22)
 	_play_btn.pressed.connect(_on_play_pressed)
-	vbox.add_child(_play_btn)
+	left.add_child(_play_btn)
 
-	var test_btn = Button.new()
-	test_btn.text = "Sandbox"
-	test_btn.custom_minimum_size = Vector2(240, 44)
-	test_btn.modulate = Color(0.55, 1.0, 0.85)
-	test_btn.tooltip_text = "All towers unlocked. Pick which enemies spawn, click towers to toggle them, manual fire only"
-	test_btn.pressed.connect(_on_test_range_pressed)
-	vbox.add_child(test_btn)
+	_mode_panel = VBoxContainer.new()
+	_mode_panel.visible = false
+	_mode_panel.add_theme_constant_override("separation", 8)
+	left.add_child(_mode_panel)
 
-	var char_btn = Button.new()
-	char_btn.text = "Character"
-	char_btn.custom_minimum_size = Vector2(240, 44)
-	char_btn.pressed.connect(_on_character_pressed)
-	vbox.add_child(char_btn)
+	var mode_hint := Label.new()
+	mode_hint.text = "Choose game mode"
+	mode_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mode_hint.add_theme_font_size_override("font_size", 13)
+	mode_hint.modulate = Color(0.7, 0.8, 0.9)
+	_mode_panel.add_child(mode_hint)
 
-	var skills_btn = Button.new()
-	skills_btn.text = "Skill Tree"
-	skills_btn.custom_minimum_size = Vector2(240, 44)
-	skills_btn.pressed.connect(_on_skills_pressed)
-	vbox.add_child(skills_btn)
+	_normal_btn = _make_btn("Normal Mode — Stage Campaign", Color(0.4, 0.85, 1.0))
+	_normal_btn.pressed.connect(_on_normal_pressed)
+	_mode_panel.add_child(_normal_btn)
 
-	var shop_btn = Button.new()
-	shop_btn.text = "Shop"
-	shop_btn.custom_minimum_size = Vector2(240, 44)
+	_infinity_btn = _make_btn("Infinity Mode — Endless Waves", Color(1.0, 0.55, 0.95))
+	_infinity_btn.pressed.connect(_on_infinity_pressed)
+	_mode_panel.add_child(_infinity_btn)
+
+	var back_btn := _make_btn("Back", Color(0.65, 0.75, 0.85))
+	back_btn.pressed.connect(_on_play_back)
+	_mode_panel.add_child(back_btn)
+
+	_hub_panel = VBoxContainer.new()
+	_hub_panel.add_theme_constant_override("separation", 10)
+	left.add_child(_hub_panel)
+
+	_sandbox_btn = _make_btn("Sandbox (Tower Test Range)", Color(0.45, 1.0, 0.9))
+	_sandbox_btn.pressed.connect(_on_sandbox_pressed)
+	_hub_panel.add_child(_sandbox_btn)
+
+	_char_btn = _make_btn("Character & Gear", Color(0.75, 0.85, 1.0))
+	_char_btn.pressed.connect(_on_character_pressed)
+	_hub_panel.add_child(_char_btn)
+
+	var shop_btn := _make_btn("Gear Shop", Color(1.0, 0.85, 0.3))
 	shop_btn.pressed.connect(_on_shop_pressed)
-	vbox.add_child(shop_btn)
+	_hub_panel.add_child(shop_btn)
 
-	var quit_btn = Button.new()
-	quit_btn.text = "Quit"
-	quit_btn.custom_minimum_size = Vector2(240, 40)
-	quit_btn.pressed.connect(_on_quit_pressed)
-	vbox.add_child(quit_btn)
+	_skill_btn = _make_btn("Skill Tree", Color(0.85, 0.65, 1.0))
+	_skill_btn.pressed.connect(_on_skill_tree_pressed)
+	_hub_panel.add_child(_skill_btn)
 
-	_refresh_stage_ui()
+	_leaderboard_btn = _make_btn("Infinity Leaderboard", Color(1.0, 0.55, 0.95))
+	_leaderboard_btn.pressed.connect(_on_leaderboard_pressed)
+	_hub_panel.add_child(_leaderboard_btn)
 
-func _change_stage(delta: int) -> void:
-	PlayerData.set_selected_stage(PlayerData.selected_stage + delta)
-	PlayerData.save_data()
-	_refresh_stage_ui()
+	var settings_btn := _make_btn("Settings", Color(0.7, 0.85, 1.0))
+	settings_btn.pressed.connect(_on_settings_pressed)
+	_hub_panel.add_child(settings_btn)
 
-func _refresh_stage_ui() -> void:
-	PlayerData.clamp_selected_stage()
-	var s: int = PlayerData.selected_stage
-	var newest: int = PlayerData.current_stage
-	var tag: String = "NEW" if s == newest else "REPLAY"
-	if PlayerData.is_boss_stage(s):
-		tag += " · BOSS STAGE"
-	_stage_label.text = "Stage %d — %s\n(%s)" % [s, PlayerData.get_stage_name(s), tag]
-	_stage_label.modulate = Color(1.0, 0.45, 0.35) if PlayerData.is_boss_stage(s) else Color(1, 1, 1)
-	var preview: Dictionary = PlayerData.get_stage_reward_preview(s)
-	_reward_preview.text = String(preview.get("summary", ""))
-	_play_btn.text = "Deploy Stage %d" % s
+	_build_leaderboard_overlay()
 
-func _on_play_pressed():
+func _build_leaderboard_overlay() -> void:
+	_leaderboard_panel = PanelContainer.new()
+	_leaderboard_panel.visible = false
+	_leaderboard_panel.set_anchors_preset(Control.PRESET_CENTER)
+	_leaderboard_panel.custom_minimum_size = Vector2(340, 420)
+	_leaderboard_panel.offset_left = -170
+	_leaderboard_panel.offset_top = -210
+	_leaderboard_panel.offset_right = 170
+	_leaderboard_panel.offset_bottom = 210
+
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.06, 0.08, 0.14, 0.98)
+	panel_style.border_color = Color(1.0, 0.55, 0.95, 0.6)
+	panel_style.set_border_width_all(2)
+	panel_style.set_corner_radius_all(10)
+	panel_style.set_content_margin_all(16)
+	_leaderboard_panel.add_theme_stylebox_override("panel", panel_style)
+	add_child(_leaderboard_panel)
+
+	var right_vbox := VBoxContainer.new()
+	right_vbox.add_theme_constant_override("separation", 8)
+	_leaderboard_panel.add_child(right_vbox)
+
+	var lb_title := Label.new()
+	lb_title.text = "INFINITY LEADERBOARD"
+	lb_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lb_title.add_theme_font_size_override("font_size", 18)
+	lb_title.modulate = Color(1.0, 0.55, 0.95)
+	right_vbox.add_child(lb_title)
+
+	var lb_sub := Label.new()
+	lb_sub.text = "Top survivors by wave, then time"
+	lb_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lb_sub.add_theme_font_size_override("font_size", 11)
+	lb_sub.modulate = Color(0.65, 0.75, 0.85)
+	right_vbox.add_child(lb_sub)
+
+	right_vbox.add_child(_spacer(4))
+
+	_leaderboard_box = VBoxContainer.new()
+	_leaderboard_box.add_theme_constant_override("separation", 6)
+	right_vbox.add_child(_leaderboard_box)
+
+	var close_btn := Button.new()
+	close_btn.text = "Close"
+	close_btn.custom_minimum_size = Vector2(120, 36)
+	close_btn.pressed.connect(_on_leaderboard_close)
+	right_vbox.add_child(close_btn)
+
+func _spacer(h: int) -> Control:
+	var s := Control.new()
+	s.custom_minimum_size = Vector2(0, h)
+	return s
+
+func _make_btn(text: String, color: Color) -> Button:
+	var btn := Button.new()
+	btn.text = text
+	btn.custom_minimum_size = Vector2(280, 40)
+	btn.modulate = color
+	return btn
+
+func _refresh_leaderboard() -> void:
+	for child in _leaderboard_box.get_children():
+		child.queue_free()
+	var board := PlayerData.get_infinity_leaderboard()
+	if board.is_empty():
+		var empty := Label.new()
+		empty.text = "No runs recorded yet.\nStart Infinity Mode to claim #1!"
+		empty.autowrap_mode = TextServer.AUTOWRAP_WORD
+		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty.add_theme_font_size_override("font_size", 12)
+		empty.modulate = Color(0.65, 0.75, 0.85)
+		_leaderboard_box.add_child(empty)
+		return
+	for i in board.size():
+		var e: Dictionary = board[i]
+		var tm := int(float(e.get("time_sec", 0.0))) / 60
+		var ts := int(float(e.get("time_sec", 0.0))) % 60
+		var row := Label.new()
+		row.text = "%d. %s\n   Wave %d  •  %02d:%02d" % [
+			i + 1,
+			String(e.get("name", "?")),
+			int(e.get("waves", 0)),
+			tm, ts
+		]
+		row.add_theme_font_size_override("font_size", 12)
+		if String(e.get("name", "")) == PlayerData.player_name:
+			row.modulate = Color(0.35, 0.95, 0.7)
+		_leaderboard_box.add_child(row)
+
+func _on_play_pressed() -> void:
+	_hub_panel.visible = false
+	_play_btn.visible = false
+	_mode_panel.visible = true
+
+func _on_play_back() -> void:
+	_hub_panel.visible = true
+	_play_btn.visible = true
+	_mode_panel.visible = false
+
+func _on_leaderboard_pressed() -> void:
+	_refresh_leaderboard()
+	_leaderboard_panel.visible = true
+	_leaderboard_panel.move_to_front()
+
+func _on_leaderboard_close() -> void:
+	_leaderboard_panel.visible = false
+
+func _on_normal_pressed() -> void:
 	PlayerData.tower_test_mode = false
+	PlayerData.session_mode = "normal"
+	PlayerData.selected_stage = PlayerData.current_stage
 	PlayerData.clamp_selected_stage()
-	PlayerData.save_data()
 	get_tree().change_scene_to_file("res://scenes/game.tscn")
 
-func _on_test_range_pressed():
+func _on_infinity_pressed() -> void:
+	PlayerData.tower_test_mode = false
+	PlayerData.session_mode = "infinity"
+	get_tree().change_scene_to_file("res://scenes/game.tscn")
+
+func _on_sandbox_pressed() -> void:
 	PlayerData.tower_test_mode = true
+	PlayerData.session_mode = "sandbox"
 	get_tree().change_scene_to_file("res://scenes/game.tscn")
 
-func _on_character_pressed():
+func _on_character_pressed() -> void:
 	get_tree().change_scene_to_file("res://scenes/character.tscn")
 
-func _on_skills_pressed():
-	get_tree().change_scene_to_file("res://scenes/skill_tree.tscn")
-
-func _on_shop_pressed():
+func _on_shop_pressed() -> void:
 	get_tree().change_scene_to_file("res://scenes/shop.tscn")
 
-func _on_quit_pressed():
-	get_tree().quit()
+func _on_skill_tree_pressed() -> void:
+	get_tree().change_scene_to_file("res://scenes/skill_tree.tscn")
+
+func _on_settings_pressed() -> void:
+	get_tree().change_scene_to_file("res://scenes/settings.tscn")

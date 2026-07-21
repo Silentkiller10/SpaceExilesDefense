@@ -47,6 +47,12 @@ var selected_stage: int = 1
 var coins: int = 0
 ## Session-only: next game scene loads as the tower test range (no progression/rewards)
 var tower_test_mode: bool = false
+## Session-only: "normal" (stage campaign) or "infinity" (endless escalating waves)
+var session_mode: String = "normal"
+var player_name: String = "Commander"
+## Top infinity runs: {name, waves, time_sec}
+var infinity_leaderboard: Array = []
+const INFINITY_LEADERBOARD_SIZE := 10
 var _uid_counter: int = 1
 var _tex_cache: Dictionary = {}
 
@@ -1128,6 +1134,46 @@ func get_skill_summary() -> String:
 		return "No skills unlocked yet"
 	return "\n".join(lines)
 
+func set_player_name(name: String) -> void:
+	var trimmed := name.strip_edges()
+	if trimmed.is_empty():
+		return
+	player_name = trimmed.substr(0, 20)
+	save_data()
+
+func submit_infinity_score(waves: int, time_sec: float) -> int:
+	var entry := {
+		"name": player_name,
+		"waves": maxi(0, waves),
+		"time_sec": maxf(0.0, time_sec),
+	}
+	infinity_leaderboard.append(entry)
+	infinity_leaderboard.sort_custom(func(a, b):
+		var aw := int(a.get("waves", 0))
+		var bw := int(b.get("waves", 0))
+		if aw != bw:
+			return aw > bw
+		return float(a.get("time_sec", 0.0)) > float(b.get("time_sec", 0.0))
+	)
+	var rank := -1
+	for i in infinity_leaderboard.size():
+		var e: Dictionary = infinity_leaderboard[i]
+		if String(e.get("name")) == String(entry["name"]) \
+				and int(e.get("waves")) == int(entry["waves"]) \
+				and is_equal_approx(float(e.get("time_sec", 0.0)), float(entry["time_sec"])):
+			rank = i + 1
+			break
+	if infinity_leaderboard.size() > INFINITY_LEADERBOARD_SIZE:
+		infinity_leaderboard.resize(INFINITY_LEADERBOARD_SIZE)
+	highest_wave = maxi(highest_wave, waves)
+	save_data()
+	if rank > INFINITY_LEADERBOARD_SIZE:
+		return -1
+	return rank
+
+func get_infinity_leaderboard() -> Array:
+	return infinity_leaderboard.duplicate(true)
+
 func save_data() -> void:
 	var data := {
 		"inventory": inventory,
@@ -1142,6 +1188,8 @@ func save_data() -> void:
 		"char_xp": char_xp,
 		"skill_points": skill_points,
 		"unlocked_skills": unlocked_skills,
+		"player_name": player_name,
+		"infinity_leaderboard": infinity_leaderboard,
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -1177,3 +1225,9 @@ func load_data() -> void:
 		unlocked_skills = skills.duplicate()
 	if not ("core" in unlocked_skills):
 		unlocked_skills.append("core")
+	player_name = String(data.get("player_name", player_name))
+	if player_name.strip_edges().is_empty():
+		player_name = "Commander"
+	var lb = data.get("infinity_leaderboard", [])
+	if typeof(lb) == TYPE_ARRAY:
+		infinity_leaderboard = lb.duplicate(true)

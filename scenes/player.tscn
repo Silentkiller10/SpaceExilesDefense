@@ -125,9 +125,4 @@ offset_top = -80.0
 offset_right = 40.0
 offset_bottom = -68.0
 
-[node name="ShockWaveTimer" type="Timer" parent="." unique_id=1465071394]
-wait_time = 5.0
-one_shot = true
-
 [connection signal="timeout" from="ShotTimer" to="." method="_on_shot_timer_timeout"]
-[connection signal="timeout" from="ShockWaveTimer" to="." method="_on_shock_wave_timer_timeout"]

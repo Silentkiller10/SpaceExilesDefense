@@ -28,17 +28,11 @@ var skill_fire_rate_bonus: float = 0.0
 var skill_pierce: int = 0
 var skill_projectiles: int = 0
 
-var has_ignition: bool = false
-var has_contact_pulse: bool = false
 var is_shot_cd: bool = false
-var is_pulse_cd: bool = false
 var invincible: bool = false
 var lr: bool = true
 var arena_width: float = 1152.0
 var rampart_y: float = 560.0
-var afk_timer: float = 0.0
-@export var afk_delay: float = 0.0
-var is_afk: bool = false
 ## Sandbox: no auto-aim/auto-fire — only shoots while click/hold on "shot"
 var manual_fire_only: bool = false
 ## Kamikaze base explosion locks the character out for a moment
@@ -49,8 +43,6 @@ var stun_timer: float = 0.0
 @onready var body_rotete_player: AnimationPlayer = $BodyRotatePlayer
 @onready var move_trail_effect: GPUParticles2D = $MovementTrailEffect
 @onready var bullet_scene = preload("res://scenes/bullet.tscn")
-@onready var shock_wave_scene = preload("res://scenes/shock_wave.tscn")
-@onready var shock_wave_timer: Timer = $ShockWaveTimer
 @onready var bullet_spawn_pos: Node2D = $BodyRotate/BulletSpawnPoint
 @onready var shot_timer: Timer = $ShotTimer
 @onready var shot_effect: GPUParticles2D = $BodyRotate/ShootingEffect
@@ -123,39 +115,39 @@ func _physics_process(delta):
 	if Input.is_action_pressed("move_left"):
 		velocity.x -= 1
 
-	# Only movement / manual fire cancel auto-aim (mouse aim no longer delays it)
-	var has_input: bool = (
-		absf(velocity.x) > 0.0
-		or Input.is_action_pressed("shot")
-		or Input.is_action_pressed("move_up")
-		or Input.is_action_pressed("move_down")
-		or Input.is_action_just_pressed("shock_wave")
-	)
-	if has_input or manual_fire_only:
-		_reset_afk()
-	else:
-		afk_timer += delta
-		if afk_timer >= afk_delay:
-			is_afk = true
+	var is_moving := absf(velocity.x) > 0.0
+	var manual_shot := Input.is_action_pressed("shot")
 
-	if is_afk:
-		var target: Node2D = _find_closest_enemy()
-		if target != null:
-			_aim_at(target.global_position)
-			_wants_fire_pose = true
-			if not is_shot_cd:
-				_try_shoot()
-		else:
-			_wants_fire_pose = false
-			body_rotate.rotation = -PI / 2.0
-	else:
+	if manual_fire_only:
 		_aim_upward_cone()
-		_wants_fire_pose = Input.is_action_pressed("shot")
-		if _wants_fire_pose and not is_shot_cd:
+		_wants_fire_pose = manual_shot
+		if manual_shot and not is_shot_cd:
 			_try_shoot()
+	elif is_moving:
+		_aim_upward_cone()
+		_wants_fire_pose = manual_shot
+		if manual_shot and not is_shot_cd:
+			_try_shoot()
+	else:
+		var auto_aim := GameSettings.auto_aim_when_idle
+		var auto_shoot := GameSettings.auto_shoot_when_idle
+		var target: Node2D = _find_closest_enemy() if auto_aim else null
 
-	if has_contact_pulse and Input.is_action_just_pressed("shock_wave") and not is_pulse_cd:
-		cast_contact_pulse()
+		if auto_aim and target != null:
+			_aim_at(target.global_position)
+		else:
+			_aim_upward_cone()
+
+		_wants_fire_pose = manual_shot or (auto_shoot and (target != null or not auto_aim))
+
+		if auto_shoot and not is_shot_cd:
+			if auto_aim:
+				if target != null:
+					_try_shoot()
+			else:
+				_try_shoot()
+		elif manual_shot and not is_shot_cd:
+			_try_shoot()
 
 	if absf(velocity.x) > 0.0:
 		velocity = velocity.normalized() * (speed * move_speed_modifier * (1.0 + gear_move_bonus))
@@ -167,17 +159,6 @@ func _physics_process(delta):
 
 	position.y = rampart_y
 	position.x = clamp(position.x, 40.0, arena_width - 40.0)
-
-func _reset_afk() -> void:
-	afk_timer = 0.0
-	is_afk = false
-
-func _unhandled_input(event):
-	# Manual click/keys cancel auto-aim; ignore mouse motion so aimbot starts immediately when idle
-	if event is InputEventMouseButton and event.pressed:
-		_reset_afk()
-	elif event is InputEventKey and event.pressed:
-		_reset_afk()
 
 func _try_shoot() -> void:
 	shoot()
@@ -319,26 +300,15 @@ func shoot():
 		bullet.damage = int(93.0 * (damage_multiplier + gear_damage_bonus + skill_damage_bonus))
 		bullet.penetration = pierce_count + skill_pierce + gear_pierce
 		bullet.knockback = knockback_strength
-		bullet.apply_ignition = has_ignition or gear_ignition
+		bullet.apply_ignition = gear_ignition
 		bullet.fork_count = gear_fork_count + bonus_fork
 		var angle_offset = start_angle + (i * spread_angle)
 		var spawn_trans = bullet_spawn_pos.global_transform.rotated_local(angle_offset)
 		bullet.setup(spawn_trans)
 		get_tree().current_scene.add_child(bullet)
 
-func cast_contact_pulse():
-	var wave = shock_wave_scene.instantiate()
-	wave.setup(global_position)
-	get_tree().current_scene.add_child(wave)
-	is_pulse_cd = true
-	var cd := 5.0 * (1.0 - gear_cooldown_reduction)
-	shock_wave_timer.start(max(1.5, cd))
-
 func _on_shot_timer_timeout():
 	is_shot_cd = false
-
-func _on_shock_wave_timer_timeout():
-	is_pulse_cd = false
 
 func take_damage(amount: int):
 	if invincible:

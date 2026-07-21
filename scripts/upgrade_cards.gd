@@ -10,10 +10,6 @@ class_name UpgradeCards
 static func all_cards() -> Array:
 	return [
 		# --- Character ---
-		{"id": "ignition", "name": "IGNITION", "description": "Bullets apply burn DoT",
-			"color": Color(1.0, 0.45, 0.15), "type": "skill", "category": "character"},
-		{"id": "contact_pulse", "name": "CONTACT PULSE", "description": "Press E for AoE blast (5s CD)",
-			"color": Color(0.35, 0.85, 1.0), "type": "skill", "category": "character"},
 		{"id": "piercing", "name": "PIERCING BULLET", "description": "+1 Penetration",
 			"color": Color(0.7, 0.4, 1.0), "type": "skill", "category": "character"},
 		{"id": "fork", "name": "SPLIT SHOT", "description": "+1 Fork",

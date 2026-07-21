@@ -59,6 +59,8 @@ var running: bool = false
 var waiting_for_clear: bool = false
 ## Sandbox: no automatic waves — enemies spawn only via spawn_sandbox_enemy()
 var test_mode: bool = false
+## Endless mode: waves never stop, difficulty ramps every wave
+var infinity_mode: bool = false
 var rng := RandomNumberGenerator.new()
 
 ## Pending spawn jobs: {"kind": "creep"|"rocketeer"|"boss", ...}
@@ -69,6 +71,11 @@ var _pending_tasks: Array = []
 
 func set_test_mode(enabled: bool) -> void:
 	test_mode = enabled
+
+func set_infinity_mode(enabled: bool) -> void:
+	infinity_mode = enabled
+	if enabled:
+		test_mode = false
 
 ## Sandbox on-demand spawning. id is one of the basic enemy ids
 ## ("small", "normal", "heavy", "ufo") or "rocketeer" / "boss".
@@ -124,13 +131,15 @@ func _process(delta: float) -> void:
 	if test_mode:
 		return
 
-	if wave >= max_waves:
+	if not infinity_mode and wave >= max_waves:
 		return
 
 	timer -= delta
 	if timer <= 0.0:
 		_start_next_wave()
-		if wave < max_waves:
+		if infinity_mode:
+			timer = max(3.0, wave_interval - wave * 0.12)
+		elif wave < max_waves:
 			timer = max(4.0, wave_interval - wave * 0.15)
 		else:
 			waiting_for_clear = true
@@ -139,11 +148,14 @@ func _start_next_wave() -> void:
 	wave += 1
 	wave_started.emit(wave)
 
-	if wave == max_waves:
+	var is_final_boss := not infinity_mode and wave == max_waves
+	var is_infinity_boss := infinity_mode and wave > 0 and wave % 5 == 0
+
+	if is_final_boss or is_infinity_boss:
 		boss_incoming.emit(wave)
 		_spawn_queue.append({"kind": "boss", "x": -1.0})
-		# Escorts get half a wave's budget so the boss stays the star
-		for job in _buy_wave_jobs(int(_wave_budget() * 0.5)):
+		var escort_budget := int(_wave_budget() * (0.5 if is_final_boss else 0.65))
+		for job in _buy_wave_jobs(escort_budget):
 			_spawn_queue.append(job)
 	else:
 		for job in _buy_wave_jobs(_wave_budget()):
@@ -153,13 +165,22 @@ func _start_next_wave() -> void:
 
 ## Total threat points this wave may spend.
 func _wave_budget() -> int:
-	var budget := 10 + wave * 5 + stage * 3
+	var eff_stage := _effective_stage()
+	var budget := 10 + wave * 5 + eff_stage * 3
+	if infinity_mode:
+		budget += wave * 3 + int(wave * wave * 0.12)
 	if _is_boss_stage():
 		budget += 6
 	return budget
 
+func _effective_stage() -> int:
+	if infinity_mode:
+		return maxi(1, 1 + wave / 8)
+	return stage
+
 func _entry_weight(entry: Dictionary) -> float:
-	var w := float(entry["base_w"]) + float(entry["w_per_stage"]) * float(stage - 1)
+	var eff := _effective_stage()
+	var w := float(entry["base_w"]) + float(entry["w_per_stage"]) * float(eff - 1)
 	return maxf(float(entry["min_w"]), w)
 
 ## Spends the budget on a weighted-random shopping list of spawn jobs.
@@ -266,16 +287,24 @@ func _finalize_completed_chunks() -> void:
 	_pending_tasks = still_pending
 
 func _is_boss_stage() -> bool:
+	if infinity_mode:
+		return wave > 0 and wave % 5 == 0
 	return PlayerData.is_boss_stage(stage)
 
 func _stage_hp_mult() -> float:
-	var m := 1.0 + (stage - 1) * 0.25
+	var eff := _effective_stage()
+	var m := 1.0 + (eff - 1) * 0.25
+	if infinity_mode:
+		m += float(wave) * 0.06
 	if _is_boss_stage():
 		m *= 1.35
 	return m
 
 func _stage_speed_mult() -> float:
-	var m := 1.0 + (stage - 1) * 0.08
+	var eff := _effective_stage()
+	var m := 1.0 + (eff - 1) * 0.08
+	if infinity_mode:
+		m += float(wave) * 0.025
 	if _is_boss_stage():
 		m *= 1.10
 	return m

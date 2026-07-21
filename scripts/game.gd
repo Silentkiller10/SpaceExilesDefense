@@ -9,6 +9,8 @@ var run_time: float = 0.0
 var game_over: bool = false
 ## Tower test range: all towers unlocked, endless waves, no progression/rewards
 var test_mode: bool = false
+## Endless infinity run until fortress falls
+var infinity_mode: bool = false
 
 var unlocked_towers: Dictionary = {
 	"laser": false,
@@ -93,6 +95,7 @@ func _ready():
 	camera.make_current()
 
 	test_mode = PlayerData.tower_test_mode
+	infinity_mode = PlayerData.session_mode == "infinity" and not test_mode
 	if test_mode:
 		# Sandbox: the character only fires while the mouse is clicked/held
 		player.manual_fire_only = true
@@ -113,11 +116,21 @@ func _ready():
 
 	wave_manager = WaveManagerScript.new()
 	add_child(wave_manager)
-	wave_manager.setup(arena_size.x, fortress.get_leak_y(), enemy_scene, boss_scene, player, fortress, PlayerData.selected_stage)
+	wave_manager.setup(
+		arena_size.x,
+		fortress.get_leak_y(),
+		enemy_scene,
+		boss_scene,
+		player,
+		fortress,
+		1 if infinity_mode else PlayerData.selected_stage
+	)
 	if test_mode:
 		wave_manager.set_test_mode(true)
 		# Beefier fortress so tower testing lasts longer
 		fortress.increase_max_health(1500)
+	elif infinity_mode:
+		wave_manager.set_infinity_mode(true)
 	wave_manager.creep_spawned.connect(_on_creep_spawned)
 	wave_manager.boss_incoming.connect(_on_boss_incoming)
 	wave_manager.wave_started.connect(_on_wave_started)
@@ -294,6 +307,9 @@ func setup_ui():
 	if test_mode:
 		level_label.text = "SANDBOX"
 		level_label.modulate = Color(0.45, 1.0, 0.9)
+	elif infinity_mode:
+		level_label.text = "INFINITY MODE"
+		level_label.modulate = Color(1.0, 0.55, 0.95)
 	else:
 		level_label.text = PlayerData.get_stage_title(PlayerData.selected_stage)
 		if PlayerData.is_boss_stage(PlayerData.selected_stage):
@@ -307,7 +323,10 @@ func setup_ui():
 	row1.add_child(time_label)
 
 	wave_label = Label.new()
-	wave_label.text = "Wave: 0" if test_mode else "Wave: 0/15"
+	if test_mode or infinity_mode:
+		wave_label.text = "Wave: 0"
+	else:
+		wave_label.text = "Wave: 0/15"
 	wave_label.add_theme_font_size_override("font_size", 18)
 	row1.add_child(wave_label)
 
@@ -579,7 +598,7 @@ func _on_creep_spawned(enemy) -> void:
 	enemy.connect("enemy_destroyed", on_enemy_destroyed)
 
 func _on_wave_started(wave: int) -> void:
-	if test_mode:
+	if test_mode or infinity_mode:
 		wave_label.text = "Wave: %d" % wave
 	else:
 		wave_label.text = "Wave: %d/15" % wave
@@ -588,6 +607,8 @@ func _on_boss_incoming(_wave: int) -> void:
 	boss_banner.visible = true
 	if test_mode:
 		boss_banner.text = "TEST BOSS INCOMING"
+	elif infinity_mode:
+		boss_banner.text = "BOSS WAVE %d" % _wave
 	elif PlayerData.is_boss_stage(PlayerData.selected_stage):
 		boss_banner.text = "MEGA BOSS — %s" % PlayerData.get_stage_name(PlayerData.selected_stage).to_upper()
 	else:
@@ -614,7 +635,7 @@ func on_enemy_destroyed(enemy):
 		trigger_level_up()
 
 func _on_level_complete(_wave: int) -> void:
-	if game_over or test_mode:
+	if game_over or test_mode or infinity_mode:
 		return
 	game_over = true
 	wave_manager.stop()
@@ -855,10 +876,6 @@ func apply_card(card: Dictionary) -> void:
 		_apply_tower_specialist(card)
 		return
 	match id:
-		"ignition":
-			player.has_ignition = true
-		"contact_pulse":
-			player.has_contact_pulse = true
 		"piercing":
 			player.pierce_count += 1
 		"fork":
@@ -950,7 +967,95 @@ func _on_fortress_destroyed() -> void:
 	game_over = true
 	wave_manager.stop()
 	get_tree().paused = true
-	_show_game_over()
+	if infinity_mode:
+		_show_infinity_game_over()
+	else:
+		_show_game_over()
+
+func _show_infinity_game_over() -> void:
+	var waves_reached: int = wave_manager.wave if wave_manager else 0
+	var rank: int = PlayerData.submit_infinity_score(waves_reached, run_time)
+
+	game_over_panel = PanelContainer.new()
+	game_over_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	game_over_panel.position = Vector2(arena_size.x * 0.5 - 180, arena_size.y * 0.5 - 200)
+	game_over_panel.custom_minimum_size = Vector2(360, 380)
+	ui_layer.add_child(game_over_panel)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	game_over_panel.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "INFINITY RUN OVER"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 22)
+	title.modulate = Color(1.0, 0.55, 0.95)
+	vbox.add_child(title)
+
+	var stats := Label.new()
+	var mins := int(run_time) / 60
+	var secs := int(run_time) % 60
+	stats.text = "Survived: Wave %d\nTime: %02d:%02d" % [waves_reached, mins, secs]
+	stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stats.add_theme_font_size_override("font_size", 16)
+	vbox.add_child(stats)
+
+	var rank_lbl := Label.new()
+	if rank > 0:
+		rank_lbl.text = "Leaderboard rank: #%d" % rank
+		rank_lbl.modulate = Color(0.35, 0.95, 0.7)
+	else:
+		rank_lbl.text = "Did not make top %d" % PlayerData.INFINITY_LEADERBOARD_SIZE
+	rank_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rank_lbl.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(rank_lbl)
+
+	var lb_title := Label.new()
+	lb_title.text = "TOP SURVIVORS"
+	lb_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lb_title.add_theme_font_size_override("font_size", 14)
+	lb_title.modulate = Color(1.0, 0.85, 0.3)
+	vbox.add_child(lb_title)
+
+	var board := PlayerData.get_infinity_leaderboard()
+	if board.is_empty():
+		var empty := Label.new()
+		empty.text = "No scores yet — be the first!"
+		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty.add_theme_font_size_override("font_size", 12)
+		vbox.add_child(empty)
+	else:
+		for i in mini(board.size(), 5):
+			var e: Dictionary = board[i]
+			var tm := int(float(e.get("time_sec", 0.0))) / 60
+			var ts := int(float(e.get("time_sec", 0.0))) % 60
+			var row := Label.new()
+			row.text = "%d. %s — Wave %d (%02d:%02d)" % [
+				i + 1,
+				String(e.get("name", "?")),
+				int(e.get("waves", 0)),
+				tm, ts
+			]
+			row.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			row.add_theme_font_size_override("font_size", 12)
+			vbox.add_child(row)
+
+	var retry_btn := Button.new()
+	retry_btn.text = "Try Again"
+	retry_btn.pressed.connect(func():
+		get_tree().paused = false
+		get_tree().change_scene_to_file("res://scenes/game.tscn")
+	)
+	vbox.add_child(retry_btn)
+
+	var hub_btn := Button.new()
+	hub_btn.text = "Return to Hub"
+	hub_btn.pressed.connect(func():
+		get_tree().paused = false
+		get_tree().change_scene_to_file("res://scenes/mainmenu.tscn")
+	)
+	vbox.add_child(hub_btn)
 
 func _show_game_over() -> void:
 	game_over_panel = PanelContainer.new()

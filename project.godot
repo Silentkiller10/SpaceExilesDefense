@@ -22,6 +22,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 PlayerData="*res://scripts/player_data.gd"
+GameSettings="*res://scripts/game_settings.gd"
 
 [display]
 
