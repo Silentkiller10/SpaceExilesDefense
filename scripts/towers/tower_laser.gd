@@ -4,7 +4,7 @@ extends "res://scripts/towers/tower_base.gd"
 
 const V := preload("res://scripts/towers/tower_visuals.gd")
 const TEX_BASE := preload("res://assets/png/towers/laser_base.png")
-const TEX_HEAD := preload("res://assets/png/towers/laser_head.png")
+const TEX_HEAD_PATH := "res://assets/png/towers/laser_head.png"
 
 const CORE := Color(0.35, 1.0, 0.55)
 const HOT := Color(0.85, 1.0, 0.35)
@@ -15,9 +15,13 @@ const HEAD_SCALE := 0.28 * TOWER_SCALE
 const AIM_SPEED := 16.0
 ## Head art points along +X at rotation 0.
 const HEAD_FACING_OFFSET := 0.0
-## Fine-tune beam origin on the barrel (head-local pixels).
-const MUZZLE_OFFSET := Vector2(0.0, 40.0 * TOWER_SCALE)
-const PIVOT_OFFSET := Vector2(4.0, -30.0) * TOWER_SCALE
+
+## Tower-local alignment (screen space at default aim): X = left/right, Y = up/down.
+@export_group("Head Alignment")
+@export var pivot_offset := Vector2(4.0, -30.0)
+@export var head_offset := Vector2(-5.0, -8.0)
+@export var muzzle_offset := Vector2(0.0, 40.0)
+
 const BASE_Y_OFFSET := 6.0 * TOWER_SCALE
 const SHADOW_RADIUS := 18.0 * TOWER_SCALE
 const LABEL_Y := 22.0 * TOWER_SCALE
@@ -59,23 +63,24 @@ func _build_visual() -> void:
 	add_child(_base_sprite)
 
 	_pivot = Node2D.new()
-	_pivot.position = _base_sprite.position + PIVOT_OFFSET
+	_pivot.position = _base_sprite.position + pivot_offset * TOWER_SCALE
 	_pivot.z_index = 1
 	add_child(_pivot)
 
-	var head_size: Vector2 = TEX_HEAD.get_size()
+	var tex_head: Texture2D = load(TEX_HEAD_PATH) as Texture2D
+	var head_size: Vector2 = tex_head.get_size() if tex_head else Vector2(429, 238)
 	_head_mount_tex = Vector2(-head_size.x * 0.34, head_size.y * 0.06)
 	_muzzle_tex = Vector2(head_size.x * 0.47, 0.0)
 
 	_head_sprite = Sprite2D.new()
-	_head_sprite.texture = TEX_HEAD
+	_head_sprite.texture = tex_head
 	_head_sprite.scale = Vector2(HEAD_SCALE, HEAD_SCALE)
-	_head_sprite.position = -_head_mount_tex * HEAD_SCALE
+	_head_sprite.position = -_head_mount_tex * HEAD_SCALE + _head_offset_pivot_local()
 	_head_sprite.z_index = 1
 	_pivot.add_child(_head_sprite)
 
 	_glow_sprite = Sprite2D.new()
-	_glow_sprite.texture = TEX_HEAD
+	_glow_sprite.texture = tex_head
 	_glow_sprite.scale = _head_sprite.scale
 	_glow_sprite.position = _head_sprite.position
 	_glow_sprite.z_index = 0
@@ -84,7 +89,7 @@ func _build_visual() -> void:
 	_pivot.move_child(_glow_sprite, 0)
 
 	_muzzle = Node2D.new()
-	_muzzle.position = (_muzzle_tex - _head_mount_tex) * HEAD_SCALE + MUZZLE_OFFSET
+	_muzzle.position = (_muzzle_tex - _head_mount_tex) * HEAD_SCALE + muzzle_offset * TOWER_SCALE
 	_head_sprite.add_child(_muzzle)
 
 	_beams = [
@@ -106,6 +111,11 @@ func _process(delta: float) -> void:
 	_update_head_fx(pulse)
 	super._process(delta)
 
+func _head_offset_pivot_local() -> Vector2:
+	if _pivot == null:
+		return head_offset * TOWER_SCALE
+	return (head_offset * TOWER_SCALE).rotated(-_pivot.rotation)
+
 func _aim_pivot(target: Node2D, delta: float) -> void:
 	if _pivot == null:
 		return
@@ -120,13 +130,13 @@ func _update_head_fx(pulse: float) -> void:
 		return
 	var kick: float = _recoil * 0.015
 	var axis := Vector2.from_angle(_pivot.rotation)
-	_head_sprite.position = -_head_mount_tex * HEAD_SCALE - axis * kick
+	_head_sprite.position = -_head_mount_tex * HEAD_SCALE + _head_offset_pivot_local() - axis * kick
 	if _glow_sprite:
 		_glow_sprite.position = _head_sprite.position
 		_glow_sprite.scale = _head_sprite.scale * (1.0 + pulse * 0.04 + _charge * 0.12)
 		_glow_sprite.modulate.a = pulse * 0.22 + _charge * 0.45
 	if _muzzle:
-		_muzzle.position = (_muzzle_tex - _head_mount_tex) * HEAD_SCALE + MUZZLE_OFFSET - axis * kick * 0.5
+		_muzzle.position = (_muzzle_tex - _head_mount_tex) * HEAD_SCALE + muzzle_offset * TOWER_SCALE - axis * kick * 0.5
 	var tint: float = 1.0 + pulse * 0.08 + _charge * 0.25
 	_head_sprite.modulate = Color(tint, tint + 0.15, tint + 0.1, 1.0)
 
