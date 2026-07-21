@@ -407,6 +407,7 @@ func _build_sandbox_panel() -> void:
 		{"id": "heavy", "label": "Heavy Meteor"},
 		{"id": "ufo", "label": "UFO Ship"},
 		{"id": "rocketeer", "label": "Rocketeer Ship"},
+		{"id": "kamikaze", "label": "Kamikaze Ship"},
 		{"id": "boss", "label": "Boss"}
 	]
 	for entry in entries:

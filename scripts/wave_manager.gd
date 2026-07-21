@@ -12,6 +12,7 @@ signal level_complete(wave: int)
 @export var max_waves: int = 15
 
 const ROCKETEER_SCENE := preload("res://scenes/enemy_ship_rocketeer.tscn")
+const KAMIKAZE_SCENE := preload("res://scenes/enemy_ship_kamikaze.tscn")
 const EnemyScript := preload("res://scripts/enemy.gd")
 
 ## --- Threat-budget wave composition ---
@@ -31,6 +32,7 @@ const SPAWN_TABLE := [
 	{"id": "ufo", "kind": "creep", "cost": 3, "base_w": 0.70, "w_per_stage": 0.08, "min_w": 0.0, "min_wave": 1, "max_per_wave": 0},
 	{"id": "heavy", "kind": "creep", "cost": 4, "base_w": 0.60, "w_per_stage": 0.10, "min_w": 0.0, "min_wave": 2, "max_per_wave": 0},
 	{"id": "rocketeer", "kind": "rocketeer", "cost": 8, "base_w": 0.15, "w_per_stage": 0.12, "min_w": 0.0, "min_wave": 3, "max_per_wave": 3},
+	{"id": "kamikaze", "kind": "kamikaze", "cost": 6, "base_w": 0.10, "w_per_stage": 0.10, "min_w": 0.0, "min_wave": 4, "max_per_wave": 2},
 ]
 
 ## --- Chunked spawn pipeline ---
@@ -75,6 +77,8 @@ func spawn_sandbox_enemy(id: String, count: int) -> void:
 		match id:
 			"rocketeer":
 				_spawn_queue.append({"kind": "rocketeer"})
+			"kamikaze":
+				_spawn_queue.append({"kind": "kamikaze"})
 			"boss":
 				_spawn_queue.append({"kind": "boss", "x": rng.randf_range(90.0, arena_width - 90.0)})
 			_:
@@ -139,7 +143,7 @@ func _start_next_wave() -> void:
 		boss_incoming.emit(wave)
 		_spawn_queue.append({"kind": "boss", "x": -1.0})
 		# Escorts get half a wave's budget so the boss stays the star
-		for job in _buy_wave_jobs(_wave_budget() / 2):
+		for job in _buy_wave_jobs(int(_wave_budget() * 0.5)):
 			_spawn_queue.append(job)
 	else:
 		for job in _buy_wave_jobs(_wave_budget()):
@@ -193,10 +197,11 @@ func _buy_wave_jobs(budget: int) -> Array:
 		var id := String(picked["id"])
 		counts[id] = int(counts.get(id, 0)) + 1
 		budget -= int(picked["cost"])
-		if String(picked["kind"]) == "rocketeer":
-			jobs.append({"kind": "rocketeer"})
-		else:
+		var kind := String(picked["kind"])
+		if kind == "creep":
 			jobs.append({"kind": "creep", "etype": EnemyScript.get_enemy_type(id)})
+		else:
+			jobs.append({"kind": kind})
 	return jobs
 
 ## --- Spawn pipeline: threaded instantiate, main-thread add ---
@@ -205,6 +210,8 @@ func _scene_for_kind(kind: String) -> PackedScene:
 	match kind:
 		"rocketeer":
 			return ROCKETEER_SCENE
+		"kamikaze":
+			return KAMIKAZE_SCENE
 		"boss":
 			return boss_scene if boss_scene else enemy_scene
 		_:
@@ -250,6 +257,8 @@ func _finalize_completed_chunks() -> void:
 			match String(job["kind"]):
 				"rocketeer":
 					_finalize_rocketeer(node)
+				"kamikaze":
+					_finalize_kamikaze(node)
 				"boss":
 					_finalize_boss(node, float(job.get("x", -1.0)))
 				_:
@@ -309,6 +318,20 @@ func _finalize_rocketeer(ship: Node) -> void:
 	var fort_dmg := 12 + wave + (stage - 1) * 2
 	var aoe_dmg := int((80.0 + float(wave) * 12.0) * _stage_hp_mult())
 	ship.setup_combat(shield, fort_dmg, aoe_dmg)
+	ship.connect("enemy_destroyed", _on_enemy_destroyed)
+	active_enemies.append(ship)
+	creep_spawned.emit(ship)
+
+func _finalize_kamikaze(ship: Node) -> void:
+	var x := rng.randf_range(90.0, arena_width - 90.0)
+	var hp := int((170.0 + float(wave) * 28.0) * _stage_hp_mult())
+	# Starts fast — the accelerating dive is its whole identity
+	var spd := (110.0 + float(wave) * 3.0) * _stage_speed_mult() * _meteor_slow_mult()
+	get_tree().current_scene.add_child(ship)
+	ship.setup_descent(Vector2(x, spawn_y - 10.0), player, fortress, hp, spd)
+	var orb_hp := int((35.0 + float(wave) * 8.0) * _stage_hp_mult())
+	var boom := 25 + wave + (stage - 1) * 3
+	ship.setup_kamikaze(orb_hp, boom)
 	ship.connect("enemy_destroyed", _on_enemy_destroyed)
 	active_enemies.append(ship)
 	creep_spawned.emit(ship)

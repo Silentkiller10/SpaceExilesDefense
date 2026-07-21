@@ -41,6 +41,8 @@ var afk_timer: float = 0.0
 var is_afk: bool = false
 ## Sandbox: no auto-aim/auto-fire — only shoots while click/hold on "shot"
 var manual_fire_only: bool = false
+## Kamikaze base explosion locks the character out for a moment
+var stun_timer: float = 0.0
 
 @onready var body_lr: Node2D = $BodyLR
 @onready var body_rotate: Node2D = $BodyRotate
@@ -99,7 +101,22 @@ func set_arena(width: float, y: float) -> void:
 	arena_width = width
 	rampart_y = y
 
+func apply_stun(duration: float) -> void:
+	stun_timer = maxf(stun_timer, duration)
+
 func _physics_process(delta):
+	if stun_timer > 0.0:
+		stun_timer -= delta
+		velocity = Vector2.ZERO
+		# Flicker while stunned; no moving, aiming, or shooting
+		modulate = Color(0.6, 0.7, 1.0) if int(stun_timer * 12.0) % 2 == 0 else Color(0.85, 0.9, 1.05)
+		if stun_timer <= 0.0:
+			modulate = Color.WHITE
+		_wants_fire_pose = false
+		_update_fire_pose()
+		move_and_slide()
+		return
+
 	velocity = Vector2.ZERO
 	if Input.is_action_pressed("move_right"):
 		velocity.x += 1
