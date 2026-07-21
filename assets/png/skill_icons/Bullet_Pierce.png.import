@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cg2gsrtbovxoj"
-path="res://.godot/imported/tower_fire_range.png-6c278ef6b82e63ba143a218f053dfc0a.ctex"
+uid="uid://dvvu7p6hkp7uq"
+path="res://.godot/imported/Bullet_Pierce.png-59b5c0e16176d588491e94863639f8de.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/png/skill_icons/tower_fire_range.png"
-dest_files=["res://.godot/imported/tower_fire_range.png-6c278ef6b82e63ba143a218f053dfc0a.ctex"]
+source_file="res://assets/png/skill_icons/Bullet_Pierce.png"
+dest_files=["res://.godot/imported/Bullet_Pierce.png-59b5c0e16176d588491e94863639f8de.ctex"]
 
 [params]
 

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cg2gsrtbovxoj"
-path="res://.godot/imported/tower_fire_range.png-6c278ef6b82e63ba143a218f053dfc0a.ctex"
+uid="uid://begkgfh1131x0"
+path="res://.godot/imported/Fortress_Hp.png-32ccbf91ff2d0ecb65343f97c1f6c3e9.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/png/skill_icons/tower_fire_range.png"
-dest_files=["res://.godot/imported/tower_fire_range.png-6c278ef6b82e63ba143a218f053dfc0a.ctex"]
+source_file="res://assets/png/skill_icons/Fortress_Hp.png"
+dest_files=["res://.godot/imported/Fortress_Hp.png-32ccbf91ff2d0ecb65343f97c1f6c3e9.ctex"]
 
 [params]
 

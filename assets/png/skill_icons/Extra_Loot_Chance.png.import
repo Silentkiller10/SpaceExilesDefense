@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cg2gsrtbovxoj"
-path="res://.godot/imported/tower_fire_range.png-6c278ef6b82e63ba143a218f053dfc0a.ctex"
+uid="uid://bim6n2m30juob"
+path="res://.godot/imported/Extra_Loot_Chance.png-92bf8e434bb44068a98c64fbb9291093.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/png/skill_icons/tower_fire_range.png"
-dest_files=["res://.godot/imported/tower_fire_range.png-6c278ef6b82e63ba143a218f053dfc0a.ctex"]
+source_file="res://assets/png/skill_icons/Extra_Loot_Chance.png"
+dest_files=["res://.godot/imported/Extra_Loot_Chance.png-92bf8e434bb44068a98c64fbb9291093.ctex"]
 
 [params]
 

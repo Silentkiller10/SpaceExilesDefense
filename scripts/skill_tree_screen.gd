@@ -1,6 +1,7 @@
 extends Control
 
-## Path of Exile–style radial skill tree: CORE center, three spokes, pan + zoom.
+## Column-style skill tree: three vertical branches under a CORE node,
+## hex skill icons linked by right-angle connectors. Pan + zoom.
 
 var _detail: Label
 var _selected_id: String = "core"
@@ -23,14 +24,21 @@ var _node_controls: Dictionary = {}
 var _line_controls: Dictionary = {}
 var _lvl_label: Label
 var _summary_label: Label
-var _icon_cache: Dictionary = {}
 var _node_lookup: Dictionary = {}
+var _icon_cache: Dictionary = {}
 
-const BOARD_SIZE := 3800.0
+const BOARD_W := 2400.0
+const BOARD_H := 3400.0
 const ZOOM_MIN := 0.28
 const ZOOM_MAX := 2.8
 const ZOOM_STEP := 1.12
 const PAN_THRESHOLD := 10.0
+
+const BRANCH_HEADERS := {
+	"loot": {"x": 0.18, "label": "LOOT", "icon": "res://assets/png/skill_icons/Main_Loot.png"},
+	"weapon": {"x": 0.50, "label": "WEAPON", "icon": "res://assets/png/skill_icons/Main_Weapon.png"},
+	"tower": {"x": 0.82, "label": "TOWER", "icon": "res://assets/png/skill_icons/Main_Tower.png"},
+}
 
 func _ready() -> void:
 	_build_ui()
@@ -136,8 +144,8 @@ func _build_ui() -> void:
 	_board_scroll.add_child(_board_holder)
 
 	_board = Control.new()
-	_board.custom_minimum_size = Vector2(BOARD_SIZE, BOARD_SIZE)
-	_board.size = Vector2(BOARD_SIZE, BOARD_SIZE)
+	_board.custom_minimum_size = Vector2(BOARD_W, BOARD_H)
+	_board.size = Vector2(BOARD_W, BOARD_H)
 	_board.mouse_filter = Control.MOUSE_FILTER_STOP
 	_board.gui_input.connect(_on_board_gui_input)
 	_board_holder.add_child(_board)
@@ -149,31 +157,21 @@ func _build_ui() -> void:
 	board_bg.gui_input.connect(_on_board_gui_input)
 	_board.add_child(board_bg)
 
-	var center := Vector2(BOARD_SIZE * 0.5, BOARD_SIZE * 0.5)
-
-	for ring_i in 14:
-		var radius: float = (0.11 + float(ring_i) * 0.048) * BOARD_SIZE
-		var ring := Line2D.new()
-		ring.width = 1.0
-		ring.default_color = Color(0.25, 0.35, 0.55, 0.16 + float(ring_i % 2) * 0.04)
-		var pts: PackedVector2Array = []
-		for s in 24:
-			var a: float = TAU * float(s) / 24.0
-			pts.append(center + Vector2(cos(a), sin(a)) * radius)
-		pts.append(pts[0])
-		ring.points = pts
-		_board.add_child(ring)
-
-	for ang_deg in [-90.0, 30.0, 150.0]:
-		var a: float = deg_to_rad(ang_deg)
-		var spoke := Line2D.new()
-		spoke.width = 1.5
-		spoke.default_color = Color(0.3, 0.4, 0.55, 0.2)
-		spoke.points = PackedVector2Array([
-			center + Vector2(cos(a), sin(a)) * (0.06 * BOARD_SIZE),
-			center + Vector2(cos(a), sin(a)) * (0.92 * BOARD_SIZE)
-		])
-		_board.add_child(spoke)
+	# Column background panels — one tinted slab per branch, like the reference.
+	for branch in BRANCH_HEADERS.keys():
+		var info: Dictionary = BRANCH_HEADERS[branch]
+		var col := _branch_color(String(branch))
+		var panel := Panel.new()
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color(col.r * 0.08, col.g * 0.08, col.b * 0.08, 0.55)
+		style.border_color = Color(col.r, col.g, col.b, 0.22)
+		style.set_border_width_all(2)
+		style.set_corner_radius_all(18)
+		panel.add_theme_stylebox_override("panel", style)
+		panel.position = Vector2(float(info["x"]) * BOARD_W - BOARD_W * 0.145, BOARD_H * 0.075)
+		panel.size = Vector2(BOARD_W * 0.29, BOARD_H * 0.88)
+		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_board.add_child(panel)
 
 	var nodes: Array = PlayerData.get_skill_nodes()
 	_node_lookup.clear()
@@ -181,10 +179,15 @@ func _build_ui() -> void:
 		_node_lookup[String(n["id"])] = n
 	var pos_map: Dictionary = {}
 	for n in nodes:
-		pos_map[String(n["id"])] = Vector2(float(n["x"]) * BOARD_SIZE, float(n["y"]) * BOARD_SIZE)
+		pos_map[String(n["id"])] = Vector2(float(n["x"]) * BOARD_W, float(n["y"]) * BOARD_H)
 
-	_draw_cluster_halos(nodes, pos_map)
+	# Header centers used so connectors pass under the main branch icons.
+	var header_pos: Dictionary = {}
+	for branch in BRANCH_HEADERS.keys():
+		var info: Dictionary = BRANCH_HEADERS[branch]
+		header_pos[String(branch)] = Vector2(float(info["x"]) * BOARD_W, BOARD_H * 0.115)
 
+	# Connectors first (under icons).
 	for n in nodes:
 		var req: String = String(n.get("requires", ""))
 		if req == "" or not pos_map.has(req):
@@ -193,53 +196,79 @@ func _build_ui() -> void:
 		var to: Vector2 = pos_map[String(n["id"])]
 		var nid: String = String(n["id"])
 		var line := Line2D.new()
-		line.width = 2.5
+		line.width = 3.0
+		line.z_index = 0
 		line.default_color = Color(0.22, 0.24, 0.3, 0.4)
-		var req_node: Dictionary = _node_lookup.get(req, {})
-		var same_cluster := String(n.get("cluster", "")) != "" and String(n.get("cluster", "")) == String(req_node.get("cluster", ""))
-		if same_cluster or bool(n.get("cluster_entry", false)):
+		# Core → first branch node: route through that branch's main icon.
+		if req == "core" and header_pos.has(String(n.get("branch", ""))):
+			var hub: Vector2 = header_pos[String(n["branch"])]
+			line.points = PackedVector2Array([
+				from,
+				Vector2(from.x, (from.y + hub.y) * 0.5),
+				Vector2(hub.x, (from.y + hub.y) * 0.5),
+				hub,
+				to
+			])
+		elif absf(from.x - to.x) < 2.0 or absf(from.y - to.y) < 2.0:
 			line.points = PackedVector2Array([from, to])
 		else:
-			var mid: Vector2 = (from + to) * 0.5
-			var side: Vector2 = (to - from).orthogonal().normalized() * 18.0
-			line.points = PackedVector2Array([from, mid + side, to])
+			var mid_y := (from.y + to.y) * 0.5
+			line.points = PackedVector2Array([
+				from, Vector2(from.x, mid_y), Vector2(to.x, mid_y), to
+			])
 		_board.add_child(line)
 		_line_controls[nid] = line
 
+	# Branch header icons (drawn above lines).
+	for branch in BRANCH_HEADERS.keys():
+		var info: Dictionary = BRANCH_HEADERS[branch]
+		_draw_branch_header(
+			header_pos[String(branch)],
+			String(info["label"]),
+			_branch_color(String(branch)),
+			String(info.get("icon", ""))
+		)
+
+	# Cluster name tags beside entry nodes.
+	for n in nodes:
+		if not bool(n.get("cluster_entry", false)):
+			continue
+		var cname := String(n.get("cluster_name", ""))
+		if cname == "":
+			continue
+		var col := _branch_color(String(n.get("branch", "core")))
+		var tag := Label.new()
+		tag.text = cname.to_upper()
+		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tag.add_theme_font_size_override("font_size", 13)
+		tag.modulate = Color(col.r, col.g, col.b, 0.75)
+		tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tag.z_index = 2
+		var p_tag: Vector2 = pos_map[String(n["id"])]
+		tag.custom_minimum_size = Vector2(160.0, 16.0)
+		tag.position = p_tag + Vector2(-80.0, -64.0)
+		_board.add_child(tag)
+
+	# Nodes — hex skill icons / circular core (above lines).
 	for n in nodes:
 		var id: String = String(n["id"])
 		var p: Vector2 = pos_map[id]
-		var is_key := bool(n.get("keystone", false)) or id == "core"
+		var is_core := id == "core"
+		var is_key := bool(n.get("keystone", false)) or is_core
 		var is_notable := bool(n.get("cluster_notable", false)) and not is_key
-		var icon_size := Vector2(88, 88) if is_key else (Vector2(72, 72) if is_notable else Vector2(58, 58))
+		var icon_size := Vector2(128, 128) if is_core else (Vector2(96, 96) if is_key else (Vector2(80, 80) if is_notable else Vector2(68, 68)))
 
 		var node := Control.new()
 		node.custom_minimum_size = icon_size
 		node.size = icon_size
 		node.position = p - icon_size * 0.5
 		node.mouse_filter = Control.MOUSE_FILTER_STOP
+		node.z_index = 3
 		node.gui_input.connect(_on_node_gui_input.bind(id))
 		_board.add_child(node)
 		_node_controls[id] = node
 
-		if is_notable or is_key:
-			var ring := Panel.new()
-			ring.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-			ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			var ring_style := StyleBoxFlat.new()
-			ring_style.bg_color = Color(0, 0, 0, 0)
-			if is_key:
-				ring_style.border_color = Color(1.0, 0.82, 0.25, 0.95)
-				ring_style.set_border_width_all(4)
-			else:
-				ring_style.border_color = Color(0.85, 0.72, 0.28, 0.85)
-				ring_style.set_border_width_all(3)
-			ring_style.set_corner_radius_all(int(icon_size.x * 0.5))
-			ring.add_theme_stylebox_override("panel", ring_style)
-			node.add_child(ring)
-
-		var icon_path := PlayerData.get_skill_icon_path(n)
-		var icon_tex := _get_icon_texture(icon_path)
+		var icon_tex := _get_icon_texture(PlayerData.get_skill_icon_path(n))
 		if icon_tex != null:
 			var tex := TextureRect.new()
 			tex.texture = icon_tex
@@ -249,14 +278,31 @@ func _build_ui() -> void:
 			tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 			node.add_child(tex)
 		else:
-			var fallback := Label.new()
-			fallback.text = String(n["name"])
-			fallback.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			fallback.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			fallback.add_theme_font_size_override("font_size", 9)
-			fallback.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			fallback.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-			node.add_child(fallback)
+			# Fallback hex + name if an icon is missing.
+			var col := _branch_color(String(n.get("branch", "core")))
+			var hex_r := icon_size.x * 0.42
+			var hex_fill := Polygon2D.new()
+			hex_fill.polygon = _hex_points(hex_r)
+			hex_fill.position = icon_size * 0.5
+			hex_fill.color = Color(col.r * 0.16, col.g * 0.16, col.b * 0.16, 0.95)
+			node.add_child(hex_fill)
+			var hex_border := Line2D.new()
+			var border_pts := _hex_points(hex_r)
+			border_pts.append(border_pts[0])
+			hex_border.points = border_pts
+			hex_border.position = icon_size * 0.5
+			hex_border.width = 4.0
+			hex_border.default_color = col
+			node.add_child(hex_border)
+			var name_label := Label.new()
+			name_label.text = String(n["name"])
+			name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			name_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+			name_label.add_theme_font_size_override("font_size", 11)
+			name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			name_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			node.add_child(name_label)
 
 	_detail = Label.new()
 	_detail.autowrap_mode = TextServer.AUTOWRAP_WORD
@@ -298,6 +344,61 @@ func _get_icon_texture(path: String) -> Texture2D:
 	_icon_cache[path] = tex
 	return tex
 
+func _hex_points(r: float) -> PackedVector2Array:
+	var pts: PackedVector2Array = []
+	for i in 6:
+		var a: float = TAU * float(i) / 6.0 - PI / 2.0
+		pts.append(Vector2(cos(a), sin(a)) * r)
+	return pts
+
+func _draw_branch_header(center: Vector2, text: String, col: Color, icon_path: String = "") -> void:
+	const ICON_SIZE := 148.0
+	var icon_tex := _get_icon_texture(icon_path)
+	if icon_tex != null:
+		var tex := TextureRect.new()
+		tex.texture = icon_tex
+		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tex.z_index = 2
+		tex.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE)
+		tex.size = Vector2(ICON_SIZE, ICON_SIZE)
+		tex.position = center - Vector2(ICON_SIZE * 0.5, ICON_SIZE * 0.5)
+		_board.add_child(tex)
+	else:
+		# Fallback circle if the main icon is missing.
+		var outer := Line2D.new()
+		outer.width = 6.0
+		outer.default_color = col
+		var pts: PackedVector2Array = []
+		for s in 32:
+			var a: float = TAU * float(s) / 32.0
+			pts.append(center + Vector2(cos(a), sin(a)) * 74.0)
+		pts.append(pts[0])
+		outer.points = pts
+		_board.add_child(outer)
+		var fill := Polygon2D.new()
+		var fpts: PackedVector2Array = []
+		for s in 32:
+			var a: float = TAU * float(s) / 32.0
+			fpts.append(Vector2(cos(a), sin(a)) * 70.0)
+		fill.polygon = fpts
+		fill.position = center
+		fill.color = Color(col.r * 0.2, col.g * 0.2, col.b * 0.2, 0.95)
+		_board.add_child(fill)
+
+	var label := Label.new()
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 18)
+	label.modulate = col.lightened(0.35)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.z_index = 2
+	label.custom_minimum_size = Vector2(160, 28)
+	label.position = center + Vector2(-80, ICON_SIZE * 0.5 + 4.0)
+	_board.add_child(label)
+
 func _refresh_tree_state() -> void:
 	if _lvl_label:
 		_lvl_label.text = "Level %d   XP %d/%d   SP: %d" % [
@@ -316,7 +417,7 @@ func _refresh_tree_state() -> void:
 		var req: String = String(n.get("requires", ""))
 		var unlocked := PlayerData.is_skill_unlocked(String(id))
 		var req_on := req != "" and PlayerData.is_skill_unlocked(req)
-		line.width = 4.0 if unlocked else 2.5
+		line.width = 4.5 if unlocked else 3.0
 		if unlocked:
 			line.default_color = _branch_color(String(n.get("branch", "core"))).lightened(0.15)
 			line.default_color.a = 0.95
@@ -344,9 +445,8 @@ func _apply_zoom_visual() -> void:
 	_zoom = clampf(_zoom, ZOOM_MIN, ZOOM_MAX)
 	_board.scale = Vector2(_zoom, _zoom)
 	_board.position = Vector2.ZERO
-	var scaled := BOARD_SIZE * _zoom
-	_board_holder.custom_minimum_size = Vector2(scaled, scaled)
-	_board_holder.size = Vector2(scaled, scaled)
+	_board_holder.custom_minimum_size = Vector2(BOARD_W * _zoom, BOARD_H * _zoom)
+	_board_holder.size = Vector2(BOARD_W * _zoom, BOARD_H * _zoom)
 	if _zoom_label:
 		_zoom_label.text = "%d%%" % int(round(_zoom * 100.0))
 
@@ -465,9 +565,8 @@ func _center_on_core() -> void:
 		return
 	var view_w: float = maxf(1.0, _board_scroll.size.x)
 	var view_h: float = maxf(1.0, _board_scroll.size.y)
-	var core := BOARD_SIZE * 0.5 * _zoom
-	_board_scroll.scroll_horizontal = int(maxi(0, int(core - view_w * 0.5)))
-	_board_scroll.scroll_vertical = int(maxi(0, int(core - view_h * 0.5)))
+	_board_scroll.scroll_horizontal = int(maxi(0, int(BOARD_W * 0.5 * _zoom - view_w * 0.5)))
+	_board_scroll.scroll_vertical = 0
 	_scroll_pos = Vector2(_board_scroll.scroll_horizontal, _board_scroll.scroll_vertical)
 
 func _restore_scroll() -> void:
@@ -484,109 +583,11 @@ func _branch_color(branch: String) -> Color:
 		"weapon":
 			return Color(1.0, 0.45, 0.35)
 		"tower":
-			return Color(0.35, 0.85, 1.0)
+			return Color(0.35, 0.75, 1.0)
 		"loot":
 			return Color(0.45, 1.0, 0.55)
 		_:
-			return Color(1.0, 0.85, 0.3)
-
-func _draw_cluster_halos(nodes: Array, pos_map: Dictionary) -> void:
-	var clusters: Dictionary = {}
-	for n in nodes:
-		var cid := String(n.get("cluster", ""))
-		if cid == "":
-			continue
-		if not clusters.has(cid):
-			clusters[cid] = {
-				"branch": String(n.get("branch", "core")),
-				"name": String(n.get("cluster_name", "")),
-				"ids": [],
-				"hub": Vector2(-1, -1),
-			}
-		if String(n.get("cluster_name", "")) != "":
-			clusters[cid]["name"] = String(n["cluster_name"])
-		if n.has("cluster_hub_x"):
-			clusters[cid]["hub"] = Vector2(float(n["cluster_hub_x"]), float(n["cluster_hub_y"]))
-		clusters[cid]["ids"].append(String(n["id"]))
-
-	for cid in clusters.keys():
-		var c: Dictionary = clusters[cid]
-		var ids: Array = c["ids"]
-		if ids.is_empty():
-			continue
-		var hub_norm: Vector2 = c["hub"]
-		var hub := Vector2(hub_norm.x * BOARD_SIZE, hub_norm.y * BOARD_SIZE)
-		if hub.x < 0.0:
-			for id in ids:
-				hub += pos_map[id]
-			hub /= float(ids.size())
-		var max_r := 0.0
-		for id in ids:
-			max_r = maxf(max_r, hub.distance_to(pos_map[id]))
-		var orbit_r := max_r + 36.0
-		var col := _branch_color(String(c["branch"]))
-		_draw_cluster_hub(hub, orbit_r, col)
-		var halo := Line2D.new()
-		halo.width = 1.5
-		halo.default_color = Color(col.r, col.g, col.b, 0.28)
-		halo.closed = true
-		var pts: PackedVector2Array = []
-		for s in 24:
-			var a: float = TAU * float(s) / 24.0
-			pts.append(hub + Vector2(cos(a), sin(a)) * orbit_r)
-		halo.points = pts
-		_board.add_child(halo)
-		var cname := String(c.get("name", ""))
-		if cname != "":
-			var tag := Label.new()
-			tag.text = cname.to_upper()
-			tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			tag.add_theme_font_size_override("font_size", 10)
-			tag.modulate = Color(col.r, col.g, col.b, 0.7)
-			tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			tag.position = hub + Vector2(-64.0, -orbit_r - 14.0)
-			tag.custom_minimum_size = Vector2(128.0, 14.0)
-			_board.add_child(tag)
-
-func _draw_cluster_hub(hub: Vector2, orbit_r: float, col: Color) -> void:
-	var hub_r := orbit_r * 0.55
-	var fill := ColorRect.new()
-	fill.color = Color(0.08, 0.09, 0.14, 0.55)
-	fill.custom_minimum_size = Vector2(hub_r * 1.24, hub_r * 1.24)
-	fill.size = fill.custom_minimum_size
-	fill.position = hub - fill.size * 0.5
-	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_board.add_child(fill)
-	var outer := Line2D.new()
-	outer.width = 3.0
-	outer.default_color = Color(0.35, 0.38, 0.45, 0.85)
-	var outer_pts: PackedVector2Array = []
-	for s in 24:
-		var a: float = TAU * float(s) / 24.0
-		outer_pts.append(hub + Vector2(cos(a), sin(a)) * hub_r)
-	outer_pts.append(outer_pts[0])
-	outer.points = outer_pts
-	_board.add_child(outer)
-	var inner := Line2D.new()
-	inner.width = 2.0
-	inner.default_color = Color(col.r, col.g, col.b, 0.45)
-	var inner_pts: PackedVector2Array = []
-	for s in 24:
-		var a: float = TAU * float(s) / 24.0
-		inner_pts.append(hub + Vector2(cos(a), sin(a)) * (hub_r * 0.62))
-	inner_pts.append(inner_pts[0])
-	inner.points = inner_pts
-	_board.add_child(inner)
-	var emblem := Label.new()
-	emblem.text = "+"
-	emblem.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	emblem.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	emblem.add_theme_font_size_override("font_size", int(hub_r * 0.9))
-	emblem.modulate = Color(col.r, col.g, col.b, 0.35)
-	emblem.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	emblem.custom_minimum_size = fill.custom_minimum_size
-	emblem.position = fill.position
-	_board.add_child(emblem)
+			return Color(0.85, 0.9, 1.0)
 
 func _on_node_pressed(skill_id: String) -> void:
 	_selected_id = skill_id

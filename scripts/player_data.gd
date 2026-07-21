@@ -760,11 +760,11 @@ func get_skill_nodes() -> Array:
 	return _skill_nodes_cache
 
 func _build_skill_nodes() -> Array:
-	## Path-of-Exile style: CORE center, three spokes, side clusters.
+	## Three vertical column branches (loot / weapon / tower) under a CORE node.
 	var nodes: Array = [
 		{"id": "core", "name": "CORE", "branch": "core", "requires": "", "cost": 0,
-			"desc": "Starting node. Follow spokes outward or branch into clusters.",
-			"x": 0.50, "y": 0.50, "bonuses": {}, "keystone": true},
+			"desc": "Starting node. Each column below is a specialization branch.",
+			"x": 0.50, "y": 0.035, "bonuses": {}, "keystone": true},
 	]
 	# Weapon — north spoke
 	var weapon := [
@@ -789,7 +789,7 @@ func _build_skill_nodes() -> Array:
 		{"id": "w19", "name": "BARRAGE", "requires": "w18", "desc": "+1 Projectile", "bonuses": {"projectiles": 1}},
 		{"id": "w20", "name": "ANNIHILATOR", "requires": "w19", "desc": "+12% Weapon Damage, +1 Pierce", "bonuses": {"weapon_damage": 0.12, "pierce": 1}, "keystone": true},
 	]
-	_append_radial_branch(nodes, weapon, "weapon", -90.0, 1)
+	_append_column_branch(nodes, weapon, "weapon", 0.50, 1)
 	_place_cluster(nodes, "w4", "weapon", "Rapid Fire", 1.0, [
 		{"id": "wf1", "name": "QUICK I", "requires": "w4", "desc": "+3% Fire Rate", "bonuses": {"weapon_fire_rate": 0.03}},
 		{"id": "wf2", "name": "QUICK II", "requires": "wf1", "desc": "+4% Fire Rate", "bonuses": {"weapon_fire_rate": 0.04}},
@@ -831,7 +831,7 @@ func _build_skill_nodes() -> Array:
 		{"id": "r19", "name": "LINK VIII", "requires": "r18", "desc": "+8% Tower Damage", "bonuses": {"tower_damage": 0.08}},
 		{"id": "r20", "name": "FORTRESS", "requires": "r19", "desc": "+12% Tower Damage, +100 Fortress HP", "bonuses": {"tower_damage": 0.12, "fortress_hp": 100}, "keystone": true},
 	]
-	_append_radial_branch(nodes, tower, "tower", 30.0, 1)
+	_append_column_branch(nodes, tower, "tower", 0.82, 1)
 	_place_cluster(nodes, "r5", "tower", "Overcharge", -1.0, [
 		{"id": "rt1", "name": "SPIN I", "requires": "r5", "desc": "+3% Tower Fire Rate", "bonuses": {"tower_fire_rate": 0.03}},
 		{"id": "rt2", "name": "SPIN II", "requires": "rt1", "desc": "+4% Tower Fire Rate", "bonuses": {"tower_fire_rate": 0.04}},
@@ -873,7 +873,7 @@ func _build_skill_nodes() -> Array:
 		{"id": "l19", "name": "SCAVENGER VI", "requires": "l18", "desc": "+10% Stage Coins", "bonuses": {"coin_bonus": 0.10}},
 		{"id": "l20", "name": "EMPEROR", "requires": "l19", "desc": "+15% Coins, +15% Loot Luck", "bonuses": {"coin_bonus": 0.15, "loot_luck": 0.15}, "keystone": true},
 	]
-	_append_radial_branch(nodes, loot, "loot", 150.0, 1)
+	_append_column_branch(nodes, loot, "loot", 0.18, 1)
 	_place_cluster(nodes, "l5", "loot", "Hoarder", 1.0, [
 		{"id": "lh1", "name": "COIN I", "requires": "l5", "desc": "+5% Stage Coins", "bonuses": {"coin_bonus": 0.05}},
 		{"id": "lh2", "name": "COIN II", "requires": "lh1", "desc": "+6% Stage Coins", "bonuses": {"coin_bonus": 0.06}},
@@ -892,21 +892,23 @@ func _build_skill_nodes() -> Array:
 		{"id": "lm3", "name": "DEAL III", "requires": "lm2", "desc": "+8% Coins, +6% Extra Loot", "bonuses": {"coin_bonus": 0.08, "extra_loot_chance": 0.06}},
 		{"id": "lm4", "name": "BARON", "requires": "lm3", "desc": "+10% Coins, +10% Loot Luck", "bonuses": {"coin_bonus": 0.10, "loot_luck": 0.10}, "keystone": true},
 	], 1)
-	_resolve_skill_layout(nodes)
 	return nodes
 
-func _append_radial_branch(out: Array, branch_nodes: Array, branch: String, base_angle_deg: float, cost: int) -> void:
-	## Place nodes on a spoke with a slight PoE-style weave.
-	const RING_STEP := 0.048
+## Vertical layout constants (normalized board coordinates).
+const COL_TOP := 0.16
+const COL_STEP := 0.040
+const COL_ZIGZAG := 0.022
+const CLUSTER_SIDE_OFFSET := 0.085
+
+func _append_column_branch(out: Array, branch_nodes: Array, branch: String, col_x: float, cost: int) -> void:
+	## Straight vertical column with a slight zigzag weave.
 	for i in branch_nodes.size():
 		var src: Dictionary = branch_nodes[i]
-		var ring: float = 0.11 + float(i) * RING_STEP
-		var weave: float = 0.0
-		if i % 2 == 1:
-			weave = 7.0
-		elif i % 4 == 2:
-			weave = -7.0
-		var ang: float = deg_to_rad(base_angle_deg + weave)
+		var zig: float = 0.0
+		if i % 4 == 1:
+			zig = -COL_ZIGZAG
+		elif i % 4 == 3:
+			zig = COL_ZIGZAG
 		var node := {
 			"id": String(src["id"]),
 			"name": String(src["name"]),
@@ -914,15 +916,15 @@ func _append_radial_branch(out: Array, branch_nodes: Array, branch: String, base
 			"requires": String(src["requires"]),
 			"cost": cost,
 			"desc": String(src["desc"]),
-			"x": 0.5 + cos(ang) * ring,
-			"y": 0.5 + sin(ang) * ring,
+			"x": col_x + zig,
+			"y": COL_TOP + float(i) * COL_STEP,
 			"bonuses": src.get("bonuses", {}),
 			"keystone": bool(src.get("keystone", false))
 		}
 		out.append(node)
 
 func _place_cluster(out: Array, anchor_id: String, branch: String, cluster_name: String, side_sign: float, cluster_nodes: Array, cost: int) -> void:
-	## PoE-style cluster: hub offset sideways, satellites on outer arc away from the spoke.
+	## Side stub: a short vertical run of nodes hanging beside the main column.
 	var anchor_pos := Vector2(-1, -1)
 	for n in out:
 		if String(n["id"]) == anchor_id:
@@ -930,22 +932,12 @@ func _place_cluster(out: Array, anchor_id: String, branch: String, cluster_name:
 			break
 	if anchor_pos.x < 0.0:
 		return
-	var core := Vector2(0.5, 0.5)
-	var outward := (anchor_pos - core).normalized()
-	var tangent := Vector2(-outward.y, outward.x) * side_sign
 	var cluster_id := cluster_name.to_lower().replace(" ", "_")
-	const CLUSTER_OFFSET := 0.115
-	const SATELLITE_RADIUS := 0.052
-	var hub := anchor_pos + tangent * CLUSTER_OFFSET
+	var cx: float = anchor_pos.x + side_sign * CLUSTER_SIDE_OFFSET
 	var count := cluster_nodes.size()
-	var arc_center := tangent.normalized()
-	var arc_half := deg_to_rad(24.0 if count <= 3 else 30.0)
+	var hub_y: float = anchor_pos.y + float(count - 1) * 0.5 * COL_STEP
 	for i in count:
 		var src: Dictionary = cluster_nodes[i]
-		var t := 0.0 if count <= 1 else float(i) / float(count - 1)
-		var ang := lerpf(-arc_half, arc_half, t)
-		var dir := arc_center.rotated(ang)
-		var pos := hub + dir * SATELLITE_RADIUS
 		var is_notable := bool(src.get("keystone", false)) or i == count - 1
 		out.append({
 			"id": String(src["id"]),
@@ -954,118 +946,53 @@ func _place_cluster(out: Array, anchor_id: String, branch: String, cluster_name:
 			"requires": String(src["requires"]),
 			"cost": cost,
 			"desc": String(src["desc"]),
-			"x": pos.x,
-			"y": pos.y,
+			"x": cx,
+			"y": anchor_pos.y + float(i) * COL_STEP,
 			"bonuses": src.get("bonuses", {}),
 			"keystone": bool(src.get("keystone", false)),
 			"cluster": cluster_id,
 			"cluster_name": cluster_name if i == 0 else "",
-			"cluster_hub_x": hub.x,
-			"cluster_hub_y": hub.y,
+			"cluster_hub_x": cx,
+			"cluster_hub_y": hub_y,
 			"cluster_notable": is_notable,
 			"cluster_entry": i == 0,
 		})
 
-func _node_layout_radius(node: Dictionary) -> float:
-	if String(node.get("id", "")) == "core" or bool(node.get("keystone", false)):
-		return 0.022
-	if bool(node.get("cluster_notable", false)):
-		return 0.018
-	if String(node.get("cluster", "")) != "":
-		return 0.014
-	return 0.016
-
-func _resolve_skill_layout(nodes: Array) -> void:
-	## Push overlapping nodes apart while keeping the core fixed.
-	const PADDING := 0.006
-	const MAX_ITERS := 24
-	for _iter in MAX_ITERS:
-		var moved := false
-		for i in nodes.size():
-			for j in range(i + 1, nodes.size()):
-				var ni: Dictionary = nodes[i]
-				var nj: Dictionary = nodes[j]
-				var a := Vector2(float(ni["x"]), float(ni["y"]))
-				var b := Vector2(float(nj["x"]), float(nj["y"]))
-				var delta := b - a
-				var dist := delta.length()
-				var min_dist := _node_layout_radius(ni) + _node_layout_radius(nj) + PADDING
-				if dist >= min_dist:
-					continue
-				var push := Vector2(0.02, 0.0) if dist < 0.0001 else delta.normalized() * (min_dist - dist)
-				var ai := 1.0
-				var aj := 1.0
-				if String(ni.get("id", "")) == "core":
-					ai = 0.0
-					aj = 2.0
-				elif String(nj.get("id", "")) == "core":
-					ai = 2.0
-					aj = 0.0
-				elif ni.has("cluster") and not nj.has("cluster"):
-					ai = 1.6
-					aj = 0.4
-				elif nj.has("cluster") and not ni.has("cluster"):
-					ai = 0.4
-					aj = 1.6
-				var total := ai + aj
-				if ai > 0.0:
-					ni["x"] = float(ni["x"]) - push.x * (ai / total)
-					ni["y"] = float(ni["y"]) - push.y * (ai / total)
-				if aj > 0.0:
-					nj["x"] = float(nj["x"]) + push.x * (aj / total)
-					nj["y"] = float(nj["y"]) + push.y * (aj / total)
-				moved = true
-		if not moved:
-			break
-	_sync_cluster_hubs(nodes)
-
-func _sync_cluster_hubs(nodes: Array) -> void:
-	var hubs: Dictionary = {}
-	for n in nodes:
-		var cid := String(n.get("cluster", ""))
-		if cid == "":
-			continue
-		if not hubs.has(cid):
-			hubs[cid] = {"sum": Vector2.ZERO, "count": 0, "branch": String(n.get("branch", ""))}
-		hubs[cid]["sum"] += Vector2(float(n["x"]), float(n["y"]))
-		hubs[cid]["count"] += 1
-	for n in nodes:
-		var cid := String(n.get("cluster", ""))
-		if cid == "" or not hubs.has(cid):
-			continue
-		var info: Dictionary = hubs[cid]
-		if int(info["count"]) <= 0:
-			continue
-		var hub: Vector2 = info["sum"] / float(info["count"])
-		n["cluster_hub_x"] = hub.x
-		n["cluster_hub_y"] = hub.y
-
 func get_skill_icon_path(node: Dictionary) -> String:
-	## Map skill bonuses to uploaded skill_icons by filename.
+	## Map skill bonuses to hex skill icons in assets/png/skill_icons/.
 	const ICON_DIR := "res://assets/png/skill_icons/"
 	if node.is_empty():
 		return ""
 	if String(node.get("id", "")) == "core":
-		return ICON_DIR + "Weapon_Damage.png"
+		return ICON_DIR + "Main_Core.png"
 	var b: Dictionary = node.get("bonuses", {})
+	# Prefer the most distinctive bonus when a node grants more than one.
+	if b.has("fork"):
+		return ICON_DIR + "Fork.png"
 	if b.has("pierce"):
-		return ICON_DIR + "Pierce.png"
+		return ICON_DIR + "Bullet_Pierce.png"
+	if b.has("projectiles"):
+		return ICON_DIR + "Projectiles.png"
 	if b.has("weapon_fire_rate") and not b.has("weapon_damage"):
-		return ICON_DIR + "Fire_Rate.png"
-	if b.has("weapon_damage") or b.has("projectiles"):
+		return ICON_DIR + "Weapon_Fire_Rate.png"
+	if b.has("weapon_damage") or b.has("weapon_fire_rate"):
 		return ICON_DIR + "Weapon_Damage.png"
-	if b.has("tower_fire_rate") and not b.has("tower_damage"):
+	if b.has("tower_fire_rate") and not b.has("tower_damage") and not b.has("fortress_hp"):
 		return ICON_DIR + "Tower_Fire_Rate.png"
+	if b.has("fortress_hp") and not b.has("tower_damage"):
+		return ICON_DIR + "Fortress_Hp.png"
 	if b.has("tower_damage"):
 		return ICON_DIR + "Tower_Damage.png"
-	if b.has("fortress_hp"):
-		return ICON_DIR + "tower_fire_range.png"
-	if b.has("coin_bonus") and not b.has("loot_luck"):
-		return ICON_DIR + "Coins.png"
-	if b.has("loot_luck") or b.has("extra_loot_chance"):
+	if b.has("extra_loot_chance") and not b.has("coin_bonus") and not b.has("loot_luck"):
+		return ICON_DIR + "Extra_Loot_Chance.png"
+	if b.has("loot_luck") and not b.has("coin_bonus"):
 		return ICON_DIR + "Loot_Luck.png"
 	if b.has("coin_bonus"):
 		return ICON_DIR + "Coins.png"
+	if b.has("extra_loot_chance"):
+		return ICON_DIR + "Extra_Loot_Chance.png"
+	if b.has("loot_luck"):
+		return ICON_DIR + "Loot_Luck.png"
 	return ""
 
 func get_skill_node(skill_id: String) -> Dictionary:

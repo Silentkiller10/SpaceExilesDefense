@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cg2gsrtbovxoj"
-path="res://.godot/imported/tower_fire_range.png-6c278ef6b82e63ba143a218f053dfc0a.ctex"
+uid="uid://c2satsheh8jcb"
+path="res://.godot/imported/Weapon_Fire_Rate.png-7a588aeca85629b9779678c8345489a7.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/png/skill_icons/tower_fire_range.png"
-dest_files=["res://.godot/imported/tower_fire_range.png-6c278ef6b82e63ba143a218f053dfc0a.ctex"]
+source_file="res://assets/png/skill_icons/Weapon_Fire_Rate.png"
+dest_files=["res://.godot/imported/Weapon_Fire_Rate.png-7a588aeca85629b9779678c8345489a7.ctex"]
 
 [params]
 
