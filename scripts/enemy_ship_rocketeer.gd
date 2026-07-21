@@ -12,7 +12,8 @@ const SHIP_TYPE := {
 	"category": "ship",
 	"texture": "res://assets/sprites/enemy_ship_1.png",
 	"sprite_scale": 0.045,
-	"collision": Vector2(72, 78)
+	"collision": Vector2(72, 78),
+	"xp": 20
 }
 
 const FIRE_INTERVAL := 2.0

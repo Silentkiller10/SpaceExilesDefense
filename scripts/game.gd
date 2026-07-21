@@ -4,7 +4,7 @@ var arena_size: Vector2
 var enemy_list: Array = []
 var kill_count: int = 0
 var level: int = 1
-var kills_to_next_level: int = 6
+var kills_to_next_level: int = 10
 var run_time: float = 0.0
 var game_over: bool = false
 ## Tower test range: all towers unlocked, endless waves, no progression/rewards
@@ -599,12 +599,15 @@ func _on_boss_incoming(_wave: int) -> void:
 func on_enemy_destroyed(enemy):
 	enemy_list.erase(enemy)
 	kill_count += 1
-	var is_boss_kill := false
-	if enemy != null and (enemy.get("is_boss") == true or String(enemy.name).to_lower().contains("boss")):
-		is_boss_kill = true
 	# Test range grants no persistent XP
 	if not test_mode:
-		PlayerData.add_char_xp(PlayerData.get_kill_xp(is_boss_kill))
+		# Tougher enemies pay more (xp_value from the enemy type)
+		var base_xp := 4
+		if enemy != null and enemy.get("xp_value") != null:
+			base_xp = int(enemy.xp_value)
+		elif enemy != null and (enemy.get("is_boss") == true or String(enemy.name).to_lower().contains("boss")):
+			base_xp = 80
+		PlayerData.add_char_xp(PlayerData.get_kill_xp(base_xp))
 		_refresh_xp_hud()
 	if kill_count >= kills_to_next_level:
 		trigger_level_up()
@@ -732,7 +735,8 @@ func trigger_level_up():
 		_close_pause_menu()
 	level += 1
 	kill_count = 0
-	kills_to_next_level = 5 + level * 2
+	# Each upgrade costs 20% more kills than the last (10, 12, 14, 17, 20...)
+	kills_to_next_level = maxi(kills_to_next_level + 1, int(round(float(kills_to_next_level) * 1.2)))
 	get_tree().paused = true
 	show_upgrade_cards()
 

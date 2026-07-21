@@ -17,7 +17,9 @@ const WALK_FPS := 24.0
 ## Spritesheet art faces right (frame 0 = idle, frames advance toward a rightward stride).
 const SPRITE_TARGET_HEIGHT := 145.0
 ## Muzzle distance along BodyRotate +X (aim axis); sprite gun points upward in side view.
-const SPRITE_MUZZLE_X := 48.0
+## Pushed out to the barrel exit of the fire-pose art so bullets and the
+## shot flash leave from the gun tip, not from inside the weapon.
+const SPRITE_MUZZLE_X := 85.0
 
 ## Kneeling firing poses — picked by aim angle while shooting.
 ## Index 0 = most horizontal aim ("1"), index 3 = almost vertical ("4").

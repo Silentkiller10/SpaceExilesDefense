@@ -193,11 +193,8 @@ func _aim_at(world_pos: Vector2) -> void:
 	var aim: Vector2 = world_pos - global_position
 	if aim.length() < 1.0:
 		aim = Vector2.UP
-	var angle: float = aim.angle()
-	# Keep mostly upward so shots don't hit the fortress behind you
-	var up: float = -PI / 2.0
-	angle = clampf(angle, up - deg_to_rad(70.0), up + deg_to_rad(70.0))
-	body_rotate.rotation = angle
+	# Full 180° — anywhere above the horizon; below it, snap to nearest side
+	body_rotate.rotation = _clamp_to_upper_half(aim.angle())
 
 func _aim_upward_cone() -> void:
 	if not rotate_flag:
@@ -206,10 +203,16 @@ func _aim_upward_cone() -> void:
 	var aim := (mouse - global_position)
 	if aim.length() < 1.0:
 		aim = Vector2.UP
-	var angle := aim.angle()
-	var up := -PI / 2.0
-	angle = clamp(angle, up - deg_to_rad(55.0), up + deg_to_rad(55.0))
-	body_rotate.rotation = angle
+	# Full 180° — from horizontal left to horizontal right
+	body_rotate.rotation = _clamp_to_upper_half(aim.angle())
+
+## Limits an aim angle to the upper half-circle (180°). Angles pointing
+## below the horizon snap to the nearest horizontal side, avoiding the
+## atan2 wrap that would flip a below-left aim over to the right.
+func _clamp_to_upper_half(angle: float) -> float:
+	if angle > 0.0:
+		return 0.0 if angle <= PI / 2.0 else -PI
+	return angle
 
 func update_body_lr():
 	if not lr_flag:
@@ -261,16 +264,17 @@ func _update_fire_pose() -> void:
 	var dev: float = rad_to_deg(wrapf(body_rotate.rotation + PI / 2.0, -PI, PI))
 	var tex: Texture2D
 	var ad: float = absf(dev)
-	if ad < 8.0:
+	if ad < 10.0:
 		tex = _fire_poses["center"]
 	else:
-		# Files are named 1 (most horizontal) .. 4 (almost vertical)
+		# Files are named 1 (most horizontal) .. 4 (almost vertical);
+		# bins spread evenly across the 180° aim arc
 		var idx: int
-		if ad < 22.0:
+		if ad < 30.0:
 			idx = 3
-		elif ad < 36.0:
-			idx = 2
 		elif ad < 50.0:
+			idx = 2
+		elif ad < 70.0:
 			idx = 1
 		else:
 			idx = 0

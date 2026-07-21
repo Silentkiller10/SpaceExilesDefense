@@ -15,7 +15,8 @@ const ENEMY_TYPES := [
 		"speed_per_wave": 2.2,
 		"sprite_scale": 0.28,
 		"collision": Vector2(28, 28),
-		"weight": 1.15
+		"weight": 1.15,
+		"xp": 3
 	},
 	{
 		"id": "normal",
@@ -27,7 +28,8 @@ const ENEMY_TYPES := [
 		"speed_per_wave": 1.5,
 		"sprite_scale": 0.11,
 		"collision": Vector2(40, 40),
-		"weight": 1.0
+		"weight": 1.0,
+		"xp": 5
 	},
 	{
 		"id": "heavy",
@@ -39,7 +41,8 @@ const ENEMY_TYPES := [
 		"speed_per_wave": 0.9,
 		"sprite_scale": 0.16,
 		"collision": Vector2(48, 48),
-		"weight": 0.85
+		"weight": 0.85,
+		"xp": 10
 	},
 	{
 		"id": "ufo",
@@ -54,7 +57,8 @@ const ENEMY_TYPES := [
 		"speed_per_wave": 1.8,
 		"sprite_scale": 0.06,
 		"collision": Vector2(44, 44),
-		"weight": 0.9
+		"weight": 0.9,
+		"xp": 7
 	},
 ]
 
@@ -71,6 +75,8 @@ var burn_dps: float = 0.0
 var pull_force: Vector2 = Vector2.ZERO
 var type_id: String = "normal"
 var category: String = "meteor"
+## Persistent-XP payout for killing this enemy (before stage/level scaling)
+var xp_value: int = 4
 var _spawn_x: float = 0.0
 var _base_sprite_scale: Vector2 = Vector2.ONE
 var _fall_trail: GPUParticles2D
@@ -184,6 +190,7 @@ func setup_descent(pos: Vector2, _player: CharacterBody2D, _fortress: Node2D, hp
 func apply_enemy_type(type: Dictionary) -> void:
 	type_id = String(type.get("id", "normal"))
 	category = String(type.get("category", "meteor"))
+	xp_value = int(type.get("xp", 4))
 	if sprite == null:
 		sprite = get_node_or_null("Enemy2D") as Sprite2D
 	if sprite:
@@ -218,6 +225,7 @@ func set_as_boss(value: bool) -> void:
 	is_boss = value
 	if value:
 		apply_enemy_type(get_enemy_type("heavy"))
+		xp_value = 80
 		scale = Vector2(2.4, 2.4)
 
 func apply_stun(duration: float) -> void:

@@ -1075,13 +1075,16 @@ func xp_for_level(level: int) -> int:
 		8:
 			return 3000
 		_:
-			return int(round(3000.0 * pow(1.7, float(level - 8))))
+			# Gentle tail (~+18%/level) — the old 1.7 exponent made
+			# everything past level 10 practically unreachable.
+			return int(round(3000.0 * pow(1.18, float(level - 8))))
 
-func get_kill_xp(is_boss: bool = false) -> int:
-	## Slightly more XP at higher levels — gentle climb.
-	var base: float = 55.0 if is_boss else 4.0
-	var scale: float = 1.0 + float(maxi(0, char_level - 1)) * 0.1
-	return maxi(1, int(round(base * scale)))
+func get_kill_xp(base: int = 4) -> int:
+	## base comes from the enemy type (tougher enemies pay more),
+	## boosted by the stage being played and a mild char-level bonus.
+	var stage_scale: float = 1.0 + 0.15 * float(maxi(0, selected_stage - 1))
+	var level_scale: float = minf(2.0, 1.0 + 0.05 * float(maxi(0, char_level - 1)))
+	return maxi(1, int(round(float(base) * stage_scale * level_scale)))
 
 func add_char_xp(amount: int) -> void:
 	if amount <= 0:
