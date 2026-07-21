@@ -13,6 +13,7 @@ signal level_complete(wave: int)
 
 const ROCKETEER_SCENE := preload("res://scenes/enemy_ship_rocketeer.tscn")
 const KAMIKAZE_SCENE := preload("res://scenes/enemy_ship_kamikaze.tscn")
+const CARRIER_SCENE := preload("res://scenes/enemy_ship_carrier.tscn")
 const EnemyScript := preload("res://scripts/enemy.gd")
 
 ## --- Threat-budget wave composition ---
@@ -33,6 +34,7 @@ const SPAWN_TABLE := [
 	{"id": "heavy", "kind": "creep", "cost": 4, "base_w": 0.60, "w_per_stage": 0.10, "min_w": 0.0, "min_wave": 2, "max_per_wave": 0},
 	{"id": "rocketeer", "kind": "rocketeer", "cost": 8, "base_w": 0.15, "w_per_stage": 0.12, "min_w": 0.0, "min_wave": 3, "max_per_wave": 3},
 	{"id": "kamikaze", "kind": "kamikaze", "cost": 6, "base_w": 0.10, "w_per_stage": 0.10, "min_w": 0.0, "min_wave": 4, "max_per_wave": 2},
+	{"id": "carrier", "kind": "carrier", "cost": 10, "base_w": 0.10, "w_per_stage": 0.10, "min_w": 0.0, "min_wave": 5, "max_per_wave": 2},
 ]
 
 ## --- Chunked spawn pipeline ---
@@ -86,6 +88,8 @@ func spawn_sandbox_enemy(id: String, count: int) -> void:
 				_spawn_queue.append({"kind": "rocketeer"})
 			"kamikaze":
 				_spawn_queue.append({"kind": "kamikaze"})
+			"carrier":
+				_spawn_queue.append({"kind": "carrier"})
 			"boss":
 				_spawn_queue.append({"kind": "boss", "x": rng.randf_range(90.0, arena_width - 90.0)})
 			_:
@@ -233,6 +237,8 @@ func _scene_for_kind(kind: String) -> PackedScene:
 			return ROCKETEER_SCENE
 		"kamikaze":
 			return KAMIKAZE_SCENE
+		"carrier":
+			return CARRIER_SCENE
 		"boss":
 			return boss_scene if boss_scene else enemy_scene
 		_:
@@ -280,6 +286,8 @@ func _finalize_completed_chunks() -> void:
 					_finalize_rocketeer(node)
 				"kamikaze":
 					_finalize_kamikaze(node)
+				"carrier":
+					_finalize_carrier(node)
 				"boss":
 					_finalize_boss(node, float(job.get("x", -1.0)))
 				_:
@@ -364,6 +372,40 @@ func _finalize_kamikaze(ship: Node) -> void:
 	ship.connect("enemy_destroyed", _on_enemy_destroyed)
 	active_enemies.append(ship)
 	creep_spawned.emit(ship)
+
+func _finalize_carrier(ship: Node) -> void:
+	# Hard cap: never more than 2 motherships alive at once
+	if _live_carrier_count() >= 2:
+		ship.free()
+		return
+	var x := rng.randf_range(140.0, arena_width - 140.0)
+	var hp := int((190.0 + float(wave) * 27.5) * _stage_hp_mult())
+	# For the carrier "speed" is the horizontal patrol speed
+	var spd := (60.0 + float(wave) * 1.5) * _stage_speed_mult()
+	get_tree().current_scene.add_child(ship)
+	ship.setup_descent(Vector2(x, spawn_y + 50.0), player, fortress, hp, spd)
+	var mini_hp := int((70.0 + float(wave) * 14.0) * _stage_hp_mult())
+	var mini_spd := (48.0 + float(wave) * 1.2) * _stage_speed_mult() * _meteor_slow_mult()
+	var mini_bullet_dmg := 3 + int(wave / 3.0) + (stage - 1)
+	ship.setup_carrier(mini_hp, mini_spd, mini_bullet_dmg)
+	ship.mini_registrar = _register_deployed_mini
+	ship.connect("enemy_destroyed", _on_enemy_destroyed)
+	active_enemies.append(ship)
+	creep_spawned.emit(ship)
+
+func _live_carrier_count() -> int:
+	var count := 0
+	for e in active_enemies:
+		if is_instance_valid(e) and e.get("type_id") == "carrier" and e.get("is_dying") != true:
+			count += 1
+	return count
+
+## Minis the carrier deploys mid-flight (or on death) enter the same
+## bookkeeping as wave spawns: XP hookup + wave-clear tracking.
+func _register_deployed_mini(mini: Node) -> void:
+	mini.connect("enemy_destroyed", _on_enemy_destroyed)
+	active_enemies.append(mini)
+	creep_spawned.emit(mini)
 
 func _finalize_boss(boss: Node, x_override: float = -1.0) -> void:
 	var x := x_override if x_override >= 0.0 else arena_width * 0.5
