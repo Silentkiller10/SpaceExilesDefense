@@ -8,12 +8,13 @@ extends Node2D
 ## damage scales with wave so it can one-shot the Carrier mother ship.
 
 const V := preload("res://scripts/towers/tower_visuals.gd")
+const BTN_ICON_PATH := "res://assets/png/skill_icons/Beam.png"
 
 const CORE := Color(0.35, 1.0, 0.55)
 const HOT := Color(0.85, 1.0, 0.35)
 const ARMED_COLOR := Color(0.8, 0.5, 1.0)
 
-const COOLDOWN := 25.0
+const COOLDOWN := 10.0
 ## Enemies within this distance of the beam line get hit
 const BEAM_HALF_WIDTH := 46.0
 const BEAM_LENGTH := 2600.0
@@ -27,6 +28,7 @@ var _armed: bool = false
 var _beams: Array[Line2D] = []
 var _beam_tween: Tween
 var _button: Control
+var _btn_icon: Texture2D
 var _reticle: Node2D
 var _pulse_t: float = 0.0
 
@@ -45,6 +47,8 @@ func setup(p: CharacterBody2D, wm: Node, ui_layer: CanvasLayer, arena: Vector2) 
 ## --- Ability button (left side of the screen) ---
 
 func _build_button(ui_layer: CanvasLayer, arena: Vector2) -> void:
+	if ResourceLoader.exists(BTN_ICON_PATH):
+		_btn_icon = load(BTN_ICON_PATH)
 	_button = Control.new()
 	var d := BTN_RADIUS * 2.0 + 8.0
 	_button.custom_minimum_size = Vector2(d, d)
@@ -71,6 +75,11 @@ func _draw_button() -> void:
 	var c := _button.size * 0.5
 	# Body
 	_button.draw_circle(c, BTN_RADIUS, Color(0.05, 0.08, 0.14, 0.95))
+	# Skill icon art (dimmed while recharging)
+	if _btn_icon:
+		var icon_half := BTN_RADIUS - 4.0
+		var tint := Color.WHITE if _cooldown_left <= 0.0 else Color(0.45, 0.45, 0.55, 0.85)
+		_button.draw_texture_rect(_btn_icon, Rect2(c - Vector2(icon_half, icon_half), Vector2(icon_half, icon_half) * 2.0), false, tint)
 	# Cooldown sweep (fills back up clockwise as the skill recharges)
 	if _cooldown_left > 0.0:
 		var frac := 1.0 - _cooldown_left / COOLDOWN
@@ -90,8 +99,8 @@ func _draw_button() -> void:
 	var font := ThemeDB.fallback_font
 	if _cooldown_left > 0.0:
 		var secs := str(int(ceil(_cooldown_left)))
-		_button.draw_string(font, c + Vector2(-BTN_RADIUS, 5.0), secs, HORIZONTAL_ALIGNMENT_CENTER, BTN_RADIUS * 2.0, 18, Color(0.75, 0.8, 0.9))
-	else:
+		_button.draw_string(font, c + Vector2(-BTN_RADIUS, 5.0), secs, HORIZONTAL_ALIGNMENT_CENTER, BTN_RADIUS * 2.0, 18, Color(0.9, 0.95, 1.0))
+	elif _btn_icon == null:
 		_button.draw_string(font, c + Vector2(-BTN_RADIUS, 4.0), "BEAM", HORIZONTAL_ALIGNMENT_CENTER, BTN_RADIUS * 2.0, 12, Color(0.85, 1.0, 0.9))
 
 ## --- Targeting reticle (follows the mouse while armed) ---

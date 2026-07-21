@@ -14,6 +14,7 @@ signal level_complete(wave: int)
 const ROCKETEER_SCENE := preload("res://scenes/enemy_ship_rocketeer.tscn")
 const KAMIKAZE_SCENE := preload("res://scenes/enemy_ship_kamikaze.tscn")
 const CARRIER_SCENE := preload("res://scenes/enemy_ship_carrier.tscn")
+const CYBORG_SCENE := preload("res://scenes/boss_cyborg.tscn")
 const EnemyScript := preload("res://scripts/enemy.gd")
 
 ## --- Threat-budget wave composition ---
@@ -80,7 +81,7 @@ func set_infinity_mode(enabled: bool) -> void:
 		test_mode = false
 
 ## Sandbox on-demand spawning. id is one of the basic enemy ids
-## ("small", "normal", "heavy", "ufo") or "rocketeer" / "boss".
+## ("small", "normal", "heavy", "ufo") or "rocketeer" / "boss" / "cyborg".
 func spawn_sandbox_enemy(id: String, count: int) -> void:
 	for i in count:
 		match id:
@@ -90,6 +91,8 @@ func spawn_sandbox_enemy(id: String, count: int) -> void:
 				_spawn_queue.append({"kind": "kamikaze"})
 			"carrier":
 				_spawn_queue.append({"kind": "carrier"})
+			"cyborg":
+				_spawn_queue.append({"kind": "cyborg"})
 			"boss":
 				_spawn_queue.append({"kind": "boss", "x": rng.randf_range(90.0, arena_width - 90.0)})
 			_:
@@ -239,6 +242,8 @@ func _scene_for_kind(kind: String) -> PackedScene:
 			return KAMIKAZE_SCENE
 		"carrier":
 			return CARRIER_SCENE
+		"cyborg":
+			return CYBORG_SCENE
 		"boss":
 			return boss_scene if boss_scene else enemy_scene
 		_:
@@ -288,6 +293,8 @@ func _finalize_completed_chunks() -> void:
 					_finalize_kamikaze(node)
 				"carrier":
 					_finalize_carrier(node)
+				"cyborg":
+					_finalize_cyborg(node)
 				"boss":
 					_finalize_boss(node, float(job.get("x", -1.0)))
 				_:
@@ -406,6 +413,27 @@ func _register_deployed_mini(mini: Node) -> void:
 	mini.connect("enemy_destroyed", _on_enemy_destroyed)
 	active_enemies.append(mini)
 	creep_spawned.emit(mini)
+
+## Cyborg boss (phase 1): jet-hovers at the top, sniping the player,
+## EMP-ing towers, and keeping 2 carrier motherships deployed.
+func _finalize_cyborg(boss: Node) -> void:
+	var hp := int((2400.0 + float(wave) * 260.0) * _stage_hp_mult())
+	# For the cyborg "speed" is the jet strafe speed between hover points
+	var spd := 170.0 * _stage_speed_mult()
+	get_tree().current_scene.add_child(boss)
+	boss.setup_descent(Vector2(arena_width * 0.5, spawn_y + 90.0), player, fortress, hp, spd)
+	# Its carrier fleet mirrors wave-spawned carrier stats
+	var c_hp := int((190.0 + float(wave) * 27.5) * _stage_hp_mult())
+	var c_spd := (60.0 + float(wave) * 1.5) * _stage_speed_mult()
+	var mini_hp := int((70.0 + float(wave) * 14.0) * _stage_hp_mult())
+	var mini_spd := (48.0 + float(wave) * 1.2) * _stage_speed_mult() * _meteor_slow_mult()
+	var mini_bullet_dmg := 3 + int(wave / 3.0) + (stage - 1)
+	var gun_dmg := 12 + wave + (stage - 1) * 2
+	boss.setup_cyborg(gun_dmg, c_hp, c_spd, mini_hp, mini_spd, mini_bullet_dmg)
+	boss.deploy_registrar = _register_deployed_mini
+	boss.connect("enemy_destroyed", _on_enemy_destroyed)
+	active_enemies.append(boss)
+	creep_spawned.emit(boss)
 
 func _finalize_boss(boss: Node, x_override: float = -1.0) -> void:
 	var x := x_override if x_override >= 0.0 else arena_width * 0.5

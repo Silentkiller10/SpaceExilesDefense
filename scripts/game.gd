@@ -456,7 +456,8 @@ func _build_sandbox_panel() -> void:
 		{"id": "rocketeer", "label": "Rocketeer Ship"},
 		{"id": "kamikaze", "label": "Kamikaze Ship"},
 		{"id": "carrier", "label": "Carrier Ship"},
-		{"id": "boss", "label": "Boss"}
+		{"id": "boss", "label": "Boss"},
+		{"id": "cyborg", "label": "Cyborg Boss (P1)"}
 	]
 	for entry in entries:
 		var btn := Button.new()

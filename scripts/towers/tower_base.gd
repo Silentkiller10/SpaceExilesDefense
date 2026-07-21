@@ -13,6 +13,8 @@ var cd_left: float = 0.0
 var unlocked: bool = false
 ## Sandbox only: tower stays visible but stops firing (toggled by clicking it)
 var sandbox_disabled: bool = false
+## Combat disable (boss grenade EMP): tower stops firing until this expires
+var disable_timer: float = 0.0
 var body: Polygon2D
 var label: Label
 var range_hint: Polygon2D
@@ -57,7 +59,24 @@ func toggle_sandbox_disabled() -> void:
 
 func set_sandbox_disabled(disabled: bool) -> void:
 	sandbox_disabled = disabled
-	modulate = Color(0.45, 0.5, 0.55, 0.45) if disabled else Color.WHITE
+	_refresh_disabled_look()
+
+## Timed combat disable (e.g. the Cyborg boss's EMP grenade).
+func apply_disable(duration: float) -> void:
+	disable_timer = maxf(disable_timer, duration)
+	_refresh_disabled_look()
+
+func is_disabled() -> bool:
+	return disable_timer > 0.0
+
+func _refresh_disabled_look() -> void:
+	if disable_timer > 0.0:
+		# EMP'd: cold blue short-circuit tint
+		modulate = Color(0.4, 0.55, 0.85, 0.55)
+	elif sandbox_disabled:
+		modulate = Color(0.45, 0.5, 0.55, 0.45)
+	else:
+		modulate = Color.WHITE
 
 func apply_local_damage_mult(mult_add: float) -> void:
 	local_damage_mult *= (1.0 + mult_add)
@@ -96,8 +115,16 @@ func _build_visual() -> void:
 	label.add_theme_font_size_override("font_size", 10)
 	add_child(label)
 
+## The EMP timer ticks here — subclasses override _process with early
+## returns, so counting down there could freeze the disable forever.
+func _physics_process(delta: float) -> void:
+	if disable_timer > 0.0:
+		disable_timer -= delta
+		if disable_timer <= 0.0:
+			_refresh_disabled_look()
+
 func _process(delta: float) -> void:
-	if not unlocked or sandbox_disabled:
+	if not unlocked or sandbox_disabled or disable_timer > 0.0:
 		return
 	cd_left -= delta
 	if cd_left > 0.0:

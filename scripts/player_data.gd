@@ -980,6 +980,8 @@ func get_skill_icon_path(node: Dictionary) -> String:
 		return ICON_DIR + "Main_Core.png"
 	var b: Dictionary = node.get("bonuses", {})
 	# Prefer the most distinctive bonus when a node grants more than one.
+	if b.has("skill_beam"):
+		return ICON_DIR + "Beam.png"
 	if b.has("fork"):
 		return ICON_DIR + "Fork.png"
 	if b.has("pierce"):

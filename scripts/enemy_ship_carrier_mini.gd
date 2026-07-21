@@ -41,7 +41,7 @@ func _fire_bullet() -> void:
 	var scene := get_tree().current_scene
 	if scene == null:
 		return
-	var bullet := Node2D.new()
+	var bullet := CharacterBody2D.new()
 	bullet.set_script(BULLET_SCRIPT)
 	scene.add_child(bullet)
 	bullet.launch(global_position + Vector2(0, 26), fortress, bullet_damage)
