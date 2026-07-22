@@ -171,9 +171,7 @@ func _damage_shield(amount: int) -> void:
 	shield_hp = maxi(0, shield_hp - amount)
 	if _shield_bar:
 		_shield_bar.value = shield_hp
-	if damage_text:
-		damage_text.text = str(amount)
-		damage_text.visible = true
+	_show_hit_flash(amount)
 	if _shield_ring:
 		_shield_ring.default_color = Color(0.8, 0.95, 1.0, 1.0)
 	if shield_hp <= 0:

@@ -51,16 +51,21 @@ const ENEMY_TYPES := [
 		# The source PNG has a fake checkerboard "transparency" baked into its
 		# pixels — strip it at load time until the asset itself is fixed.
 		"strip_background": true,
-		"base_hp": 140,
-		"hp_per_wave": 30,
-		"base_speed": 58.0,
-		"speed_per_wave": 1.8,
-		"sprite_scale": 0.06,
-		"collision": Vector2(44, 44),
+		"base_hp": 480,
+		"hp_per_wave": 96,
+		"base_speed": 50.0,
+		"speed_per_wave": 1.5,
+		"sprite_scale": 0.07,
+		"collision": Vector2(48, 48),
 		"weight": 0.9,
-		"xp": 7
+		"xp": 9
 	},
 ]
+
+## UFO support aura — nearby enemies get a max-HP boost + red glow.
+const UFO_SUPPORT_RADIUS := 190.0
+const UFO_SUPPORT_HP_FRAC := 0.40
+const UFO_SUPPORT_COLOR := Color(1.0, 0.22, 0.18)
 
 @export var health: int = 180
 @export var speed: float = 40.0
@@ -77,12 +82,26 @@ var type_id: String = "normal"
 var category: String = "meteor"
 ## Persistent-XP payout for killing this enemy (before stage/level scaling)
 var xp_value: int = 4
+var max_health: int = 180
 var _spawn_x: float = 0.0
 var _base_sprite_scale: Vector2 = Vector2.ONE
 var _fall_trail: GPUParticles2D
 var _ember_trail: GPUParticles2D
 var _trail_category: String = ""
 var _fall_time: float = 0.0
+
+## UFO support (source)
+var _is_support_ufo: bool = false
+var _support_ring: Node2D
+var _support_ring_line: Line2D
+var _support_ring_fill: Polygon2D
+var _aura_buffed: Dictionary = {}
+
+## UFO support (receiver)
+var _ufo_support_active: bool = false
+var _ufo_support_refs: int = 0
+var _ufo_support_bonus: int = 0
+var _support_glow: Sprite2D
 
 @onready var animation_tree: AnimationTree = $AnimationTree
 @onready var damage_text: Label = $DamageTextContainer/DamageText
@@ -181,9 +200,10 @@ func setup_descent(pos: Vector2, _player: CharacterBody2D, _fortress: Node2D, hp
 	player = _player
 	fortress = _fortress
 	health = hp
+	max_health = hp
 	speed = spd
 	if health_bar:
-		health_bar.max_value = health
+		health_bar.max_value = max_health
 		health_bar.value = health
 	_ensure_fall_vfx()
 
@@ -219,6 +239,9 @@ func apply_enemy_type(type: Dictionary) -> void:
 		var shape := (collision_shape.shape as RectangleShape2D).duplicate() as RectangleShape2D
 		shape.size = sz
 		collision_shape.shape = shape
+	_is_support_ufo = (type_id == "ufo")
+	if _is_support_ufo:
+		_build_support_ring()
 	_ensure_fall_vfx()
 
 func set_as_boss(value: bool) -> void:
@@ -248,6 +271,126 @@ func apply_burn(duration: float, dps: float) -> void:
 func apply_pull(force: Vector2) -> void:
 	# Vertical only — never slide sideways
 	pull_force.y += force.y
+
+## --- UFO support aura -------------------------------------------------------
+
+func _build_support_ring() -> void:
+	if _support_ring != null and is_instance_valid(_support_ring):
+		return
+	_support_ring = Node2D.new()
+	_support_ring.z_index = -2
+	add_child(_support_ring)
+
+	var pts := PackedVector2Array()
+	for i in 48:
+		pts.append(Vector2.from_angle(float(i) / 48.0 * TAU) * UFO_SUPPORT_RADIUS)
+
+	_support_ring_fill = Polygon2D.new()
+	_support_ring_fill.polygon = pts
+	_support_ring_fill.color = Color(UFO_SUPPORT_COLOR.r, UFO_SUPPORT_COLOR.g, UFO_SUPPORT_COLOR.b, 0.10)
+	_support_ring.add_child(_support_ring_fill)
+	_support_ring_line = null
+
+func _update_support_aura() -> void:
+	if not _is_support_ufo or is_dying:
+		return
+	if _support_ring:
+		var pulse := 1.0 + sin(_fall_time * 3.5) * 0.03
+		_support_ring.scale = Vector2(pulse, pulse)
+		if _support_ring_fill:
+			var a := 0.08 + 0.04 * (0.5 + 0.5 * sin(_fall_time * 4.0))
+			_support_ring_fill.color = Color(UFO_SUPPORT_COLOR.r, UFO_SUPPORT_COLOR.g, UFO_SUPPORT_COLOR.b, a)
+
+	var r2 := UFO_SUPPORT_RADIUS * UFO_SUPPORT_RADIUS
+	var still: Dictionary = {}
+	for e in get_tree().get_nodes_in_group("enemy"):
+		if e == self or not is_instance_valid(e):
+			continue
+		if e.get("is_dying") == true:
+			continue
+		# Don't buff other support UFOs — they project their own rings.
+		if e.get("type_id") == "ufo":
+			continue
+		if global_position.distance_squared_to(e.global_position) > r2:
+			continue
+		var eid: int = e.get_instance_id()
+		if e.has_method("set_ufo_support") and not _aura_buffed.has(eid):
+			e.set_ufo_support(true)
+		still[eid] = e
+
+	for id in _aura_buffed.keys():
+		if still.has(id):
+			continue
+		var prev = _aura_buffed[id]
+		if is_instance_valid(prev) and prev.has_method("set_ufo_support"):
+			prev.set_ufo_support(false)
+	_aura_buffed = still
+
+func _clear_support_aura() -> void:
+	for id in _aura_buffed.keys():
+		var e = _aura_buffed[id]
+		if is_instance_valid(e) and e.has_method("set_ufo_support"):
+			e.set_ufo_support(false)
+	_aura_buffed.clear()
+
+## Called by nearby UFO supports. Grants +40% max HP and a red glow while active.
+func set_ufo_support(active: bool) -> void:
+	if _is_support_ufo:
+		return
+	if active:
+		_ufo_support_refs += 1
+		if _ufo_support_refs == 1:
+			_ufo_support_active = true
+			_ufo_support_bonus = maxi(1, int(round(float(max_health) * UFO_SUPPORT_HP_FRAC)))
+			max_health += _ufo_support_bonus
+			health += _ufo_support_bonus
+			if health_bar:
+				health_bar.max_value = max_health
+				health_bar.value = health
+			_ensure_support_glow(true)
+		else:
+			_sync_support_glow()
+		return
+
+	_ufo_support_refs = maxi(0, _ufo_support_refs - 1)
+	if _ufo_support_refs > 0:
+		return
+	_ufo_support_active = false
+	max_health = maxi(1, max_health - _ufo_support_bonus)
+	if health > 0:
+		health = clampi(health, 1, max_health)
+	_ufo_support_bonus = 0
+	if health_bar:
+		health_bar.max_value = max_health
+		health_bar.value = health
+	_ensure_support_glow(false)
+
+func _ensure_support_glow(on: bool) -> void:
+	if on:
+		if _support_glow == null or not is_instance_valid(_support_glow):
+			_support_glow = Sprite2D.new()
+			_support_glow.z_index = -1
+			_support_glow.z_as_relative = true
+			add_child(_support_glow)
+		_support_glow.visible = true
+		_sync_support_glow()
+	elif _support_glow and is_instance_valid(_support_glow):
+		_support_glow.visible = false
+
+func _sync_support_glow() -> void:
+	if _support_glow == null or not is_instance_valid(_support_glow) or not _support_glow.visible:
+		return
+	if sprite == null or not is_instance_valid(sprite):
+		return
+	_support_glow.texture = sprite.texture
+	_support_glow.offset = sprite.offset
+	_support_glow.centered = sprite.centered
+	_support_glow.flip_h = sprite.flip_h
+	_support_glow.flip_v = sprite.flip_v
+	_support_glow.rotation = sprite.rotation
+	_support_glow.scale = sprite.scale * 1.22
+	var pulse := 0.4 + 0.3 * (0.5 + 0.5 * sin(_fall_time * 7.0))
+	_support_glow.modulate = Color(1.15, 0.12, 0.08, pulse)
 
 func _ensure_fall_vfx() -> void:
 	# Rebuild trails if the category changed since they were created
@@ -370,6 +513,10 @@ func _physics_process(delta):
 		velocity = Vector2.ZERO
 		move_and_slide()
 		_process_burn(delta)
+		if _is_support_ufo:
+			_update_support_aura()
+		elif _ufo_support_active:
+			_sync_support_glow()
 		return
 
 	_fall_time += delta
@@ -384,6 +531,10 @@ func _physics_process(delta):
 
 	_update_fall_visual()
 	_process_burn(delta)
+	if _is_support_ufo:
+		_update_support_aura()
+	elif _ufo_support_active:
+		_sync_support_glow()
 
 	var leak_y := 560.0
 	if fortress and fortress.has_method("get_leak_y"):
@@ -431,6 +582,8 @@ func _leak_into_fortress() -> void:
 			mult = float(fortress.leak_damage_mult)
 		dmg = maxi(1, int(round(float(dmg) * mult)))
 		fortress.take_damage(dmg)
+	if _is_support_ufo:
+		_clear_support_aura()
 	is_dying = true
 	queue_free()
 
@@ -480,11 +633,35 @@ func get_hit(damage: int, bullet_trans: Transform2D, knockback: float = 0.0, app
 			sprite.modulate = Color.WHITE
 
 func _show_hit_flash(amount: int) -> void:
-	if damage_text:
-		damage_text.text = str(amount)
-		damage_text.visible = true
+	_spawn_damage_number(amount)
 	if sprite:
 		sprite.modulate = Color(1.6, 1.35, 1.1)
+
+func _spawn_damage_number(amount: int) -> void:
+	if amount <= 0 or not is_inside_tree():
+		return
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	var lbl := Label.new()
+	lbl.text = str(amount)
+	lbl.z_index = 45
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var settings := LabelSettings.new()
+	settings.font_size = 18
+	settings.font_color = Color(1.0, 0.9, 0.45, 1.0)
+	settings.outline_size = 3
+	settings.outline_color = Color(0.08, 0.02, 0.02, 0.9)
+	lbl.label_settings = settings
+	scene.add_child(lbl)
+	var jitter := Vector2(randf_range(-14.0, 14.0), randf_range(-10.0, 2.0))
+	lbl.global_position = global_position + Vector2(-12.0, -34.0) + jitter
+	var start_y := lbl.global_position.y
+	var tw := lbl.create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(lbl, "global_position:y", start_y - 30.0, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(lbl, "modulate:a", 0.0, 0.5).set_delay(0.12)
+	tw.chain().tween_callback(lbl.queue_free)
 
 func _spawn_blood(bullet_trans: Transform2D) -> void:
 	if blood_particle == null or not is_inside_tree():
@@ -504,6 +681,13 @@ func die():
 	if is_dying:
 		return
 	is_dying = true
+	if _is_support_ufo:
+		_clear_support_aura()
+	if _ufo_support_active:
+		_ufo_support_refs = 0
+		_ufo_support_active = false
+		_ufo_support_bonus = 0
+		_ensure_support_glow(false)
 	_play_kill_sound()
 	if _fall_trail:
 		_fall_trail.emitting = false
@@ -513,6 +697,10 @@ func die():
 		health_bar.visible = false
 	if damage_text:
 		damage_text.visible = false
+	if _support_ring and is_instance_valid(_support_ring):
+		_support_ring.visible = false
+	if _support_glow and is_instance_valid(_support_glow):
+		_support_glow.visible = false
 	if sprite and is_inside_tree():
 		var tw := create_tween()
 		tw.tween_property(sprite, "modulate:a", 0.0, 0.3)
