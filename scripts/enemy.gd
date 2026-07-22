@@ -231,6 +231,16 @@ func set_as_boss(value: bool) -> void:
 func apply_stun(duration: float) -> void:
 	stun_timer = max(stun_timer, duration)
 
+## 1.0 = normal. Stasis Zone and similar effects pull this below 1.
+func get_move_speed_scale() -> float:
+	var scale := 1.0
+	if not is_inside_tree():
+		return scale
+	for z in get_tree().get_nodes_in_group("stasis_zone"):
+		if z.has_method("get_slow_for") and is_instance_valid(z):
+			scale = minf(scale, float(z.get_slow_for(global_position)))
+	return scale
+
 func apply_burn(duration: float, dps: float) -> void:
 	burn_timer = max(burn_timer, duration)
 	burn_dps = max(burn_dps, dps)
@@ -365,7 +375,8 @@ func _physics_process(delta):
 	_fall_time += delta
 
 	# Strict vertical fall — lock X so nothing can push sideways
-	velocity = Vector2(0.0, speed + pull_force.y)
+	var scale := get_move_speed_scale()
+	velocity = Vector2(0.0, (speed + pull_force.y) * scale)
 	pull_force = Vector2(0.0, lerpf(pull_force.y, 0.0, 8.0 * delta))
 	move_and_slide()
 	global_position.x = _spawn_x

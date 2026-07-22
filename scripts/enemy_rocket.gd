@@ -83,7 +83,7 @@ func _physics_process(delta: float) -> void:
 			base_speed += ACCEL_STEP
 		spd = base_speed
 
-	velocity = Vector2(0.0, spd)
+	velocity = Vector2(0.0, spd * _stasis_scale())
 	move_and_slide()
 
 	# Heat up: shift toward red the longer the rocket survives
@@ -101,6 +101,15 @@ func _physics_process(delta: float) -> void:
 		leak_y = fortress.get_leak_y()
 	if global_position.y >= leak_y:
 		_hit_fortress()
+
+func _stasis_scale() -> float:
+	var scale := 1.0
+	if not is_inside_tree():
+		return scale
+	for z in get_tree().get_nodes_in_group("stasis_zone"):
+		if z.has_method("get_slow_for") and is_instance_valid(z):
+			scale = minf(scale, float(z.get_slow_for(global_position)))
+	return scale
 
 func _emit_trail(delta: float, heat: float) -> void:
 	_trail_t -= delta

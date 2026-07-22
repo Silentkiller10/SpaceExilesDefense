@@ -63,7 +63,7 @@ func _physics_process(delta):
 	_fall_time += delta
 
 	# Left-right patrol at spawn height — never advances on the base
-	velocity = Vector2(speed * _patrol_dir, 0.0)
+	velocity = Vector2(speed * _patrol_dir * get_move_speed_scale(), 0.0)
 	move_and_slide()
 	if global_position.x <= EDGE_MARGIN:
 		_patrol_dir = 1.0

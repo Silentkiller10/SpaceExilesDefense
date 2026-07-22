@@ -99,7 +99,7 @@ func _physics_process(delta):
 			_pop_orb(_orbs[0])
 
 	_dash = move_toward(_dash, 0.0, DASH_DECAY * delta)
-	velocity = _heading * (speed + _dash) + Vector2(0.0, pull_force.y)
+	velocity = _heading * (speed + _dash) * get_move_speed_scale() + Vector2(0.0, pull_force.y)
 	pull_force = Vector2(0.0, lerpf(pull_force.y, 0.0, 8.0 * delta))
 	move_and_slide()
 	global_position.x = clampf(global_position.x, 40.0, _arena_w - 40.0)

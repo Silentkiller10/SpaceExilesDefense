@@ -64,7 +64,9 @@ const GearSystemScript = preload("res://scripts/gear.gd")
 const UpgradeCardsScript = preload("res://scripts/upgrade_cards.gd")
 const WaveManagerScript = preload("res://scripts/wave_manager.gd")
 const ActiveSkillBeamScript = preload("res://scripts/active_skill_beam.gd")
+const ActiveSkillStasisScript = preload("res://scripts/active_skill_stasis.gd")
 var _active_beam: Node2D
+var _active_stasis: Node2D
 var tower_scenes := {
 	"laser": preload("res://scenes/towers/tower_laser.tscn"),
 	"cannon": preload("res://scenes/towers/tower_cannon.tscn"),
@@ -144,12 +146,13 @@ func _ready():
 	MusicManager.play_game_music()
 
 func _setup_active_skills() -> void:
-	# Sandbox always has Beam for testing; otherwise needs the skill-tree unlock.
-	if not test_mode and not PlayerData.has_active_skill_beam():
-		return
+	# Beam + Stasis Zone are always available in every run.
 	_active_beam = ActiveSkillBeamScript.new()
 	add_child(_active_beam)
 	_active_beam.setup(player, wave_manager, ui_layer, arena_size)
+	_active_stasis = ActiveSkillStasisScript.new()
+	add_child(_active_stasis)
+	_active_stasis.setup(player, wave_manager, ui_layer, arena_size)
 
 func _setup_arena_visuals() -> void:
 	if background:
@@ -441,7 +444,8 @@ func _build_sandbox_panel() -> void:
 		{"id": "kamikaze", "label": "Kamikaze Ship"},
 		{"id": "carrier", "label": "Carrier Ship"},
 		{"id": "boss", "label": "Boss"},
-		{"id": "cyborg", "label": "Cyborg Boss (P1)"}
+		{"id": "cyborg", "label": "Cyborg Boss (P1)"},
+		{"id": "giant_star", "label": "Giant Star Boss"}
 	]
 	for entry in entries:
 		var btn := Button.new()
@@ -622,7 +626,12 @@ func _on_boss_incoming(_wave: int) -> void:
 	if test_mode:
 		boss_banner.text = "TEST BOSS INCOMING"
 	elif infinity_mode:
-		boss_banner.text = "BOSS WAVE %d" % _wave
+		if wave_manager and wave_manager._effective_stage() > 10:
+			boss_banner.text = "GIANT STAR — WAVE %d" % _wave
+		else:
+			boss_banner.text = "BOSS WAVE %d" % _wave
+	elif PlayerData.selected_stage > 10:
+		boss_banner.text = "GIANT STAR — %s" % PlayerData.get_stage_name(PlayerData.selected_stage).to_upper()
 	elif PlayerData.is_boss_stage(PlayerData.selected_stage):
 		boss_banner.text = "MEGA BOSS — %s" % PlayerData.get_stage_name(PlayerData.selected_stage).to_upper()
 	else:

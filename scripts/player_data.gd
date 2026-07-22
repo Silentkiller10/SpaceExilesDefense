@@ -685,6 +685,8 @@ func is_boss_stage(stage: int) -> bool:
 func get_stage_name(stage: int) -> String:
 	var s: int = maxi(1, stage)
 	if is_boss_stage(s):
+		if s > 10:
+			return "The Giant Star"
 		var bi: int = (s / BOSS_STAGE_INTERVAL) - 1
 		return BOSS_STAGE_NAMES[bi % BOSS_STAGE_NAMES.size()]
 	var zi: int = s - 1 - (s / BOSS_STAGE_INTERVAL)

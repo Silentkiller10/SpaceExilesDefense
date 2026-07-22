@@ -15,6 +15,7 @@ const ROCKETEER_SCENE := preload("res://scenes/enemy_ship_rocketeer.tscn")
 const KAMIKAZE_SCENE := preload("res://scenes/enemy_ship_kamikaze.tscn")
 const CARRIER_SCENE := preload("res://scenes/enemy_ship_carrier.tscn")
 const CYBORG_SCENE := preload("res://scenes/boss_cyborg.tscn")
+const GIANT_STAR_SCENE := preload("res://scenes/boss_star.tscn")
 const EnemyScript := preload("res://scripts/enemy.gd")
 
 ## --- Threat-budget wave composition ---
@@ -80,7 +81,7 @@ func set_infinity_mode(enabled: bool) -> void:
 		test_mode = false
 
 ## Sandbox on-demand spawning. id is one of the basic enemy ids
-## ("small", "normal", "heavy", "ufo") or "rocketeer" / "boss" / "cyborg".
+## ("small", "normal", "heavy", "ufo") or "rocketeer" / "boss" / "cyborg" / "giant_star".
 func spawn_sandbox_enemy(id: String, count: int) -> void:
 	for i in count:
 		match id:
@@ -92,6 +93,8 @@ func spawn_sandbox_enemy(id: String, count: int) -> void:
 				_spawn_queue.append({"kind": "carrier"})
 			"cyborg":
 				_spawn_queue.append({"kind": "cyborg"})
+			"giant_star":
+				_spawn_queue.append({"kind": "giant_star"})
 			"boss":
 				_spawn_queue.append({"kind": "boss", "x": rng.randf_range(90.0, arena_width - 90.0)})
 			_:
@@ -159,7 +162,10 @@ func _start_next_wave() -> void:
 
 	if is_final_boss or is_infinity_boss:
 		boss_incoming.emit(wave)
-		_spawn_queue.append({"kind": "boss", "x": -1.0})
+		if _should_spawn_giant_star():
+			_spawn_queue.append({"kind": "giant_star"})
+		else:
+			_spawn_queue.append({"kind": "boss", "x": -1.0})
 		var escort_budget := int(_wave_budget() * (0.5 if is_final_boss else 0.65))
 		for job in _buy_wave_jobs(escort_budget):
 			_spawn_queue.append(job)
@@ -168,6 +174,10 @@ func _start_next_wave() -> void:
 			_spawn_queue.append(job)
 	# First chunk of the new wave lands on the next frame
 	_chunk_timer = 0.0
+
+func _should_spawn_giant_star() -> bool:
+	## Giant Star replaces the end boss once the campaign is past stage 10.
+	return _effective_stage() > 10
 
 ## Total threat points this wave may spend.
 func _wave_budget() -> int:
@@ -243,6 +253,8 @@ func _scene_for_kind(kind: String) -> PackedScene:
 			return CARRIER_SCENE
 		"cyborg":
 			return CYBORG_SCENE
+		"giant_star":
+			return GIANT_STAR_SCENE
 		"boss":
 			return boss_scene if boss_scene else enemy_scene
 		_:
@@ -294,6 +306,8 @@ func _finalize_completed_chunks() -> void:
 					_finalize_carrier(node)
 				"cyborg":
 					_finalize_cyborg(node)
+				"giant_star":
+					_finalize_giant_star(node)
 				"boss":
 					_finalize_boss(node, float(job.get("x", -1.0)))
 				_:
@@ -430,6 +444,20 @@ func _finalize_cyborg(boss: Node) -> void:
 	var gun_dmg := 12 + wave + (stage - 1) * 2
 	boss.setup_cyborg(gun_dmg, c_hp, c_spd, mini_hp, mini_spd, mini_bullet_dmg)
 	boss.deploy_registrar = _register_deployed_mini
+	boss.connect("enemy_destroyed", _on_enemy_destroyed)
+	active_enemies.append(boss)
+	creep_spawned.emit(boss)
+
+## Giant Star — post-stage-10 end boss. Huge HP, slow drift, rains falling stars.
+func _finalize_giant_star(boss: Node) -> void:
+	var hp := int((90000.0 + float(wave) * 5200.0 + float(maxi(0, stage - 10)) * 8000.0) * _stage_hp_mult())
+	# Enter from above the arena so it drifts in instead of popping on-screen
+	var spd := 28.0 * _stage_speed_mult()
+	get_tree().current_scene.add_child(boss)
+	boss.setup_descent(Vector2(arena_width * 0.5, -220.0), player, fortress, hp, spd)
+	var dmg_scale := 1.0 + float(maxi(0, stage - 10)) * 0.08 + float(wave) * 0.02
+	if boss.has_method("setup_star"):
+		boss.setup_star(dmg_scale)
 	boss.connect("enemy_destroyed", _on_enemy_destroyed)
 	active_enemies.append(boss)
 	creep_spawned.emit(boss)

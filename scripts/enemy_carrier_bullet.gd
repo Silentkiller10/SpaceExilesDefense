@@ -44,12 +44,21 @@ func launch(origin: Vector2, _fortress: Node2D, damage_to_fortress: int) -> void
 func _physics_process(delta: float) -> void:
 	if is_dying:
 		return
-	velocity = Vector2(0.0, SPEED)
+	velocity = Vector2(0.0, SPEED * _stasis_scale())
 	move_and_slide()
 	if global_position.y >= _leak_line_y():
 		_hit_fortress()
 	elif global_position.y > 2400.0:
 		queue_free()
+
+func _stasis_scale() -> float:
+	var scale := 1.0
+	if not is_inside_tree():
+		return scale
+	for z in get_tree().get_nodes_in_group("stasis_zone"):
+		if z.has_method("get_slow_for") and is_instance_valid(z):
+			scale = minf(scale, float(z.get_slow_for(global_position)))
+	return scale
 
 func _leak_line_y() -> float:
 	if fortress and fortress.has_method("get_leak_y"):

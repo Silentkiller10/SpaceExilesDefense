@@ -111,7 +111,7 @@ func _update_movement(delta: float) -> void:
 			_pick_move_target()
 			velocity = Vector2.ZERO
 		else:
-			velocity = to_target.normalized() * speed * speed_mult
+			velocity = to_target.normalized() * speed * speed_mult * get_move_speed_scale()
 	if absf(velocity.x) > 5.0:
 		_facing = signf(velocity.x)
 	move_and_slide()
