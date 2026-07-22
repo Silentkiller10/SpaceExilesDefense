@@ -795,7 +795,7 @@ func _build_skill_nodes() -> Array:
 		{"id": "w19", "name": "BARRAGE", "requires": "w18", "desc": "+1 Projectile", "bonuses": {"projectiles": 1}},
 		{"id": "w20", "name": "ANNIHILATOR", "requires": "w19", "desc": "+12% Weapon Damage, +1 Pierce", "bonuses": {"weapon_damage": 0.12, "pierce": 1}, "keystone": true},
 	]
-	_append_column_branch(nodes, weapon, "weapon", 0.38, 1)
+	_append_column_branch(nodes, weapon, "weapon", 0.50, 1)
 	_place_cluster(nodes, "w4", "weapon", "Rapid Fire", 1.0, [
 		{"id": "wf1", "name": "QUICK I", "requires": "w4", "desc": "+3% Fire Rate", "bonuses": {"weapon_fire_rate": 0.03}},
 		{"id": "wf2", "name": "QUICK II", "requires": "wf1", "desc": "+4% Fire Rate", "bonuses": {"weapon_fire_rate": 0.04}},
@@ -813,6 +813,12 @@ func _build_skill_nodes() -> Array:
 		{"id": "ws2", "name": "SPLIT II", "requires": "ws1", "desc": "+5% Weapon Damage", "bonuses": {"weapon_damage": 0.05}},
 		{"id": "ws3", "name": "SPLIT III", "requires": "ws2", "desc": "+1 Projectile", "bonuses": {"projectiles": 1}},
 		{"id": "ws4", "name": "STORM", "requires": "ws3", "desc": "+1 Projectile, +8% Weapon Damage", "bonuses": {"projectiles": 1, "weapon_damage": 0.08}, "keystone": true},
+	], 1)
+	## Active skill — early unlock off CORE (left of the weapon column).
+	_place_cluster(nodes, "core", "weapon", "Active Skills", -1.0, [
+		{"id": "beam", "name": "BEAM", "requires": "core",
+			"desc": "Active skill: arm and fire a piercing laser through enemies (10s cooldown).",
+			"bonuses": {"skill_beam": 1}, "keystone": true},
 	], 1)
 	# Tower — southeast spoke
 	var tower := [
@@ -837,7 +843,7 @@ func _build_skill_nodes() -> Array:
 		{"id": "r19", "name": "LINK VIII", "requires": "r18", "desc": "+8% Tower Damage", "bonuses": {"tower_damage": 0.08}},
 		{"id": "r20", "name": "FORTRESS", "requires": "r19", "desc": "+12% Tower Damage, +100 Fortress HP", "bonuses": {"tower_damage": 0.12, "fortress_hp": 100}, "keystone": true},
 	]
-	_append_column_branch(nodes, tower, "tower", 0.62, 1)
+	_append_column_branch(nodes, tower, "tower", 0.82, 1)
 	_place_cluster(nodes, "r5", "tower", "Overcharge", -1.0, [
 		{"id": "rt1", "name": "SPIN I", "requires": "r5", "desc": "+3% Tower Fire Rate", "bonuses": {"tower_fire_rate": 0.03}},
 		{"id": "rt2", "name": "SPIN II", "requires": "rt1", "desc": "+4% Tower Fire Rate", "bonuses": {"tower_fire_rate": 0.04}},
@@ -879,7 +885,7 @@ func _build_skill_nodes() -> Array:
 		{"id": "l19", "name": "SCAVENGER VI", "requires": "l18", "desc": "+10% Stage Coins", "bonuses": {"coin_bonus": 0.10}},
 		{"id": "l20", "name": "EMPEROR", "requires": "l19", "desc": "+15% Coins, +15% Loot Luck", "bonuses": {"coin_bonus": 0.15, "loot_luck": 0.15}, "keystone": true},
 	]
-	_append_column_branch(nodes, loot, "loot", 0.14, 1)
+	_append_column_branch(nodes, loot, "loot", 0.18, 1)
 	_place_cluster(nodes, "l5", "loot", "Hoarder", 1.0, [
 		{"id": "lh1", "name": "COIN I", "requires": "l5", "desc": "+5% Stage Coins", "bonuses": {"coin_bonus": 0.05}},
 		{"id": "lh2", "name": "COIN II", "requires": "lh1", "desc": "+6% Stage Coins", "bonuses": {"coin_bonus": 0.06}},
@@ -898,13 +904,6 @@ func _build_skill_nodes() -> Array:
 		{"id": "lm3", "name": "DEAL III", "requires": "lm2", "desc": "+8% Coins, +6% Extra Loot", "bonuses": {"coin_bonus": 0.08, "extra_loot_chance": 0.06}},
 		{"id": "lm4", "name": "BARON", "requires": "lm3", "desc": "+10% Coins, +10% Loot Luck", "bonuses": {"coin_bonus": 0.10, "loot_luck": 0.10}, "keystone": true},
 	], 1)
-	# Active skills — castable in-run abilities (more coming later)
-	var active := [
-		{"id": "beam", "name": "BEAM", "requires": "core",
-			"desc": "Active Skill: press the Beam button in a run, then click a target point — fires a piercing beam through every enemy in its line. 25s cooldown, damage scales with wave.",
-			"bonuses": {"skill_beam": 1}, "keystone": true},
-	]
-	_append_column_branch(nodes, active, "active", 0.86, 1)
 	return nodes
 
 ## Vertical layout constants (normalized board coordinates).
@@ -1045,6 +1044,9 @@ func try_unlock_skill(skill_id: String) -> Dictionary:
 	save_data()
 	return {"ok": true, "id": skill_id}
 
+func has_active_skill_beam() -> bool:
+	return int(get_skill_bonuses().get("skill_beam", 0)) > 0
+
 func get_skill_bonuses() -> Dictionary:
 	var out := {
 		"weapon_damage": 0.0,
@@ -1140,8 +1142,8 @@ func get_skill_summary() -> String:
 		lines.append("+%d%% Loot Luck" % int(round(float(b.loot_luck) * 100.0)))
 	if float(b.extra_loot_chance) > 0.0:
 		lines.append("+%d%% Extra Loot Chance" % int(round(float(b.extra_loot_chance) * 100.0)))
-	if int(b.skill_beam) > 0:
-		lines.append("Beam (Active Skill)")
+	if int(b.get("skill_beam", 0)) > 0:
+		lines.append("Active: BEAM")
 	if lines.is_empty():
 		return "No skills unlocked yet"
 	return "\n".join(lines)

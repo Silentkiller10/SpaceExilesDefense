@@ -63,8 +63,8 @@ var boss_scene = preload("res://scenes/boss_carrier.tscn")
 const GearSystemScript = preload("res://scripts/gear.gd")
 const UpgradeCardsScript = preload("res://scripts/upgrade_cards.gd")
 const WaveManagerScript = preload("res://scripts/wave_manager.gd")
-const MUSIC_PATH := "res://assets/music/game_music.mp3"
-var _music_player: AudioStreamPlayer
+const ActiveSkillBeamScript = preload("res://scripts/active_skill_beam.gd")
+var _active_beam: Node2D
 var tower_scenes := {
 	"laser": preload("res://scenes/towers/tower_laser.tscn"),
 	"cannon": preload("res://scenes/towers/tower_cannon.tscn"),
@@ -139,23 +139,17 @@ func _ready():
 	wave_manager.level_complete.connect(_on_level_complete)
 
 	setup_ui()
-	_setup_active_skills()
 	_on_fortress_health_changed(fortress.health, fortress.max_health)
-	_start_game_music()
+	_setup_active_skills()
+	MusicManager.play_game_music()
 
-func _start_game_music() -> void:
-	var stream := load(MUSIC_PATH) as AudioStream
-	if stream == null:
+func _setup_active_skills() -> void:
+	# Sandbox always has Beam for testing; otherwise needs the skill-tree unlock.
+	if not test_mode and not PlayerData.has_active_skill_beam():
 		return
-	if stream is AudioStreamMP3:
-		(stream as AudioStreamMP3).loop = true
-	_music_player = AudioStreamPlayer.new()
-	_music_player.stream = stream
-	_music_player.bus = "Music"
-	_music_player.volume_db = 0.0
-	_music_player.process_mode = Node.PROCESS_MODE_ALWAYS
-	add_child(_music_player)
-	_music_player.play()
+	_active_beam = ActiveSkillBeamScript.new()
+	add_child(_active_beam)
+	_active_beam.setup(player, wave_manager, ui_layer, arena_size)
 
 func _setup_arena_visuals() -> void:
 	if background:
@@ -258,16 +252,6 @@ func _unlock_tower(id: String) -> void:
 	unlocked_towers[id] = true
 	if towers.has(id) and towers[id].has_method("unlock"):
 		towers[id].unlock()
-
-## Active skills unlocked in the skill tree get their ability buttons here.
-func _setup_active_skills() -> void:
-	if int(PlayerData.get_skill_bonuses().get("skill_beam", 0)) <= 0:
-		return
-	var beam := Node2D.new()
-	beam.name = "BeamSkill"
-	beam.set_script(preload("res://scripts/active_skill_beam.gd"))
-	add_child(beam)
-	beam.setup(player, wave_manager, ui_layer, arena_size)
 
 ## Sandbox: click a tower to switch it on/off
 func _unhandled_input(event) -> void:
@@ -467,15 +451,6 @@ func _build_sandbox_panel() -> void:
 		btn.pressed.connect(_on_sandbox_spawn_pressed.bind(String(entry["id"])))
 		box.add_child(btn)
 
-	var refresh_btn := Button.new()
-	refresh_btn.text = "Refresh Skills"
-	refresh_btn.tooltip_text = "Reset active skill cooldowns"
-	refresh_btn.add_theme_font_size_override("font_size", 13)
-	refresh_btn.custom_minimum_size = Vector2(128, 30)
-	refresh_btn.modulate = Color(0.8, 0.55, 1.0)
-	refresh_btn.pressed.connect(_on_sandbox_refresh_skills)
-	box.add_child(refresh_btn)
-
 	var hint := Label.new()
 	hint.text = "Click a tower to\ntoggle it on/off"
 	hint.add_theme_font_size_override("font_size", 11)
@@ -489,12 +464,6 @@ func _on_sandbox_amount_toggled(pressed: bool, amount: int) -> void:
 func _on_sandbox_spawn_pressed(id: String) -> void:
 	if wave_manager:
 		wave_manager.spawn_sandbox_enemy(id, sandbox_spawn_amount)
-
-## Sandbox: put every active skill back off cooldown.
-func _on_sandbox_refresh_skills() -> void:
-	for child in get_children():
-		if child.has_method("reset_cooldown"):
-			child.reset_cooldown()
 
 func _can_toggle_pause() -> bool:
 	if game_over:

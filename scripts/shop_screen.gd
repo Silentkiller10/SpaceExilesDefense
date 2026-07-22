@@ -6,6 +6,7 @@ var _status: Label
 var _selected_row: int = 0
 
 func _ready() -> void:
+	MusicManager.play_menu_music()
 	_build_ui()
 
 func _selected_row_def() -> Dictionary:

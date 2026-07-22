@@ -13,6 +13,7 @@ var _leaderboard_panel: PanelContainer
 var _leaderboard_btn: Button
 
 func _ready() -> void:
+	MusicManager.play_menu_music()
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	var bg := ColorRect.new()
 	bg.color = Color(0.04, 0.05, 0.09, 1.0)

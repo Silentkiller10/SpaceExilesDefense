@@ -12,6 +12,7 @@ enum Section { SOUNDS, GRAPHICS, PLAYER }
 var _section: Section = Section.SOUNDS
 
 func _ready() -> void:
+	MusicManager.play_menu_music()
 	_build_ui()
 	_show_section(Section.SOUNDS)
 

@@ -19,14 +19,11 @@ run/main_scene="uid://c8loading1screen"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 
-[audio]
-
-buses/default_bus_layout="res://default_bus_layout.tres"
-
 [autoload]
 
 PlayerData="*res://scripts/player_data.gd"
 GameSettings="*res://scripts/game_settings.gd"
+MusicManager="*res://scripts/music_manager.gd"
 
 [display]
 

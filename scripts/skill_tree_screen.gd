@@ -35,13 +35,13 @@ const ZOOM_STEP := 1.12
 const PAN_THRESHOLD := 10.0
 
 const BRANCH_HEADERS := {
-	"loot": {"x": 0.14, "label": "LOOT", "icon": "res://assets/png/skill_icons/Main_Loot.png"},
-	"weapon": {"x": 0.38, "label": "WEAPON", "icon": "res://assets/png/skill_icons/Main_Weapon.png"},
-	"tower": {"x": 0.62, "label": "TOWER", "icon": "res://assets/png/skill_icons/Main_Tower.png"},
-	"active": {"x": 0.86, "label": "ACTIVE SKILLS", "icon": ""},
+	"loot": {"x": 0.18, "label": "LOOT", "icon": "res://assets/png/skill_icons/Main_Loot.png"},
+	"weapon": {"x": 0.50, "label": "WEAPON", "icon": "res://assets/png/skill_icons/Main_Weapon.png"},
+	"tower": {"x": 0.82, "label": "TOWER", "icon": "res://assets/png/skill_icons/Main_Tower.png"},
 }
 
 func _ready() -> void:
+	MusicManager.play_menu_music()
 	_build_ui()
 
 func _build_ui() -> void:
@@ -169,8 +169,8 @@ func _build_ui() -> void:
 		style.set_border_width_all(2)
 		style.set_corner_radius_all(18)
 		panel.add_theme_stylebox_override("panel", style)
-		panel.position = Vector2(float(info["x"]) * BOARD_W - BOARD_W * 0.112, BOARD_H * 0.075)
-		panel.size = Vector2(BOARD_W * 0.224, BOARD_H * 0.88)
+		panel.position = Vector2(float(info["x"]) * BOARD_W - BOARD_W * 0.145, BOARD_H * 0.075)
+		panel.size = Vector2(BOARD_W * 0.29, BOARD_H * 0.88)
 		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_board.add_child(panel)
 
@@ -587,8 +587,6 @@ func _branch_color(branch: String) -> Color:
 			return Color(0.35, 0.75, 1.0)
 		"loot":
 			return Color(0.45, 1.0, 0.55)
-		"active":
-			return Color(0.8, 0.5, 1.0)
 		_:
 			return Color(0.85, 0.9, 1.0)
 

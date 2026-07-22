@@ -35,7 +35,6 @@ const SPAWN_TABLE := [
 	{"id": "heavy", "kind": "creep", "cost": 4, "base_w": 0.60, "w_per_stage": 0.10, "min_w": 0.0, "min_wave": 2, "max_per_wave": 0},
 	{"id": "rocketeer", "kind": "rocketeer", "cost": 8, "base_w": 0.15, "w_per_stage": 0.12, "min_w": 0.0, "min_wave": 3, "max_per_wave": 3},
 	{"id": "kamikaze", "kind": "kamikaze", "cost": 6, "base_w": 0.10, "w_per_stage": 0.10, "min_w": 0.0, "min_wave": 4, "max_per_wave": 2},
-	{"id": "carrier", "kind": "carrier", "cost": 10, "base_w": 0.10, "w_per_stage": 0.10, "min_w": 0.0, "min_wave": 5, "max_per_wave": 2},
 ]
 
 ## --- Chunked spawn pipeline ---
