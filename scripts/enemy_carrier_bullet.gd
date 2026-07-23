@@ -6,7 +6,7 @@ extends CharacterBody2D
 
 const TEX_PATH := "res://assets/sprites/machine_gun_bullet.png"
 const BULLET_SCALE := Vector2(0.05, 0.05)
-const SPEED := 340.0
+const SPEED := 240.0
 ## Red-hot tint so hostile bullets read differently from tower fire
 const TINT := Color(1.0, 0.45, 0.4)
 

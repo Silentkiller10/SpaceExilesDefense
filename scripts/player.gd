@@ -55,12 +55,7 @@ var base_fire_interval: float = 0.9
 
 const CharacterVisualScript = preload("res://scripts/character_visual.gd")
 
-var _body_anim: AnimatedSprite2D
-## Kneeling fire poses keyed by aim direction ({center, left: [...], right: [...]})
-var _fire_poses: Dictionary = {}
-var _fire_pose_sprite: Sprite2D
-## True on frames where the character is actively aiming/firing
-var _wants_fire_pose: bool = false
+var _body_anim: PlayerJetpackBody
 
 func _ready():
 	if health_bar:
@@ -69,15 +64,6 @@ func _ready():
 	if shot_timer:
 		base_fire_interval = shot_timer.wait_time
 	_body_anim = CharacterVisualScript.build_sprite_body(body_lr)
-	_fire_poses = CharacterVisualScript.load_fire_poses()
-	if not _fire_poses.is_empty():
-		_fire_pose_sprite = Sprite2D.new()
-		_fire_pose_sprite.name = "FirePose"
-		_fire_pose_sprite.z_index = 1
-		_fire_pose_sprite.visible = false
-		var ps: float = CharacterVisualScript.FIRE_POSE_SCALE
-		_fire_pose_sprite.scale = Vector2(ps, ps)
-		body_lr.add_child(_fire_pose_sprite)
 	body_rotate.scale = Vector2(CharacterVisualScript.COMBAT_SCALE, CharacterVisualScript.COMBAT_SCALE)
 	var muzzle_x: float = CharacterVisualScript.SPRITE_MUZZLE_X
 	bullet_spawn_pos.position = Vector2(muzzle_x, 0.0)
@@ -104,8 +90,6 @@ func _physics_process(delta):
 		modulate = Color(0.6, 0.7, 1.0) if int(stun_timer * 12.0) % 2 == 0 else Color(0.85, 0.9, 1.05)
 		if stun_timer <= 0.0:
 			modulate = Color.WHITE
-		_wants_fire_pose = false
-		_update_fire_pose()
 		move_and_slide()
 		return
 
@@ -116,37 +100,21 @@ func _physics_process(delta):
 		velocity.x -= 1
 
 	var is_moving := absf(velocity.x) > 0.0
-	var manual_shot := Input.is_action_pressed("shot")
+	var target: Node2D = _find_closest_enemy()
+	var has_enemy := target != null
 
-	if manual_fire_only:
-		_aim_upward_cone()
-		_wants_fire_pose = manual_shot
-		if manual_shot and not is_shot_cd:
-			_try_shoot()
-	elif is_moving:
-		_aim_upward_cone()
-		_wants_fire_pose = manual_shot
-		if manual_shot and not is_shot_cd:
-			_try_shoot()
+	# Moving → shoot straight up; idle → auto-aim at closest enemy.
+	if is_moving or not has_enemy:
+		_aim_straight_up()
 	else:
-		var auto_aim := GameSettings.auto_aim_when_idle
-		var auto_shoot := GameSettings.auto_shoot_when_idle
-		var target: Node2D = _find_closest_enemy() if auto_aim else null
+		_aim_at(target.global_position)
 
-		if auto_aim and target != null:
-			_aim_at(target.global_position)
-		else:
-			_aim_upward_cone()
-
-		_wants_fire_pose = manual_shot or (auto_shoot and (target != null or not auto_aim))
-
-		if auto_shoot and not is_shot_cd:
-			if auto_aim:
-				if target != null:
-					_try_shoot()
-			else:
+	# Only fire when an enemy exists (sandbox still requires click/hold).
+	if has_enemy and not is_shot_cd:
+		if manual_fire_only:
+			if Input.is_action_pressed("shot"):
 				_try_shoot()
-		elif manual_shot and not is_shot_cd:
+		else:
 			_try_shoot()
 
 	if absf(velocity.x) > 0.0:
@@ -154,7 +122,6 @@ func _physics_process(delta):
 		move_trail_effect.emitting = true
 
 	update_body_lr()
-	_update_fire_pose()
 	move_and_slide()
 
 	position.y = rampart_y
@@ -194,15 +161,10 @@ func _aim_at(world_pos: Vector2) -> void:
 	# Full 180° — anywhere above the horizon; below it, snap to nearest side
 	body_rotate.rotation = _clamp_to_upper_half(aim.angle())
 
-func _aim_upward_cone() -> void:
+func _aim_straight_up() -> void:
 	if not rotate_flag:
 		return
-	var mouse := get_global_mouse_position()
-	var aim := (mouse - global_position)
-	if aim.length() < 1.0:
-		aim = Vector2.UP
-	# Full 180° — from horizontal left to horizontal right
-	body_rotate.rotation = _clamp_to_upper_half(aim.angle())
+	body_rotate.rotation = Vector2.UP.angle()
 
 ## Limits an aim angle to the upper half-circle (180°). Angles pointing
 ## below the horizon snap to the nearest horizontal side, avoiding the
@@ -245,49 +207,7 @@ func update_body_lr():
 		if _body_anim.animation != "idle":
 			_body_anim.play("idle")
 
-## Swap the walk/idle body for a kneeling firing pose picked by aim angle
-## (mouse direction when aiming manually, target direction when auto-aiming).
-func _update_fire_pose() -> void:
-	if _fire_pose_sprite == null:
-		return
-	# Walking cancels the kneel — the walk animation takes over
-	var show_pose: bool = _wants_fire_pose and absf(velocity.x) <= 0.01
-	if not show_pose:
-		_fire_pose_sprite.visible = false
-		if _body_anim:
-			_body_anim.visible = true
-		return
-
-	# Degrees away from straight up: positive = right, negative = left
-	var dev: float = rad_to_deg(wrapf(body_rotate.rotation + PI / 2.0, -PI, PI))
-	var tex: Texture2D
-	var ad: float = absf(dev)
-	if ad < 10.0:
-		tex = _fire_poses["center"]
-	else:
-		# Files are named 1 (most horizontal) .. 4 (almost vertical);
-		# bins spread evenly across the 180° aim arc
-		var idx: int
-		if ad < 30.0:
-			idx = 3
-		elif ad < 50.0:
-			idx = 2
-		elif ad < 70.0:
-			idx = 1
-		else:
-			idx = 0
-		tex = _fire_poses["right"][idx] if dev > 0.0 else _fire_poses["left"][idx]
-
-	var ps: float = CharacterVisualScript.FIRE_POSE_SCALE
-	_fire_pose_sprite.texture = tex
-	# Keep every pose's feet on the same ground line as the walk sprite
-	_fire_pose_sprite.position = Vector2(0.0, CharacterVisualScript.FIRE_POSE_FEET_Y - tex.get_height() * ps * 0.5)
-	_fire_pose_sprite.visible = true
-	if _body_anim:
-		_body_anim.visible = false
-
 func shoot():
-	body_rotete_player.play("Shot")
 	shot_effect.emitting = true
 	audio_player.play()
 

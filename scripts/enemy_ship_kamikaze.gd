@@ -26,9 +26,9 @@ const ORB_ORBIT_SPEED := 2.2
 ## Seconds between automatic orb pops
 const POP_INTERVAL := 0.5
 ## Speed gained every 0.1 seconds of flight
-const SPEED_GAIN := 4.0
+const SPEED_GAIN := 2.5
 ## Extra burst speed added by each pop's dash (decays quickly)
-const DASH_BOOST := 380.0
+const DASH_BOOST := 260.0
 const DASH_DECAY := 620.0
 ## Course change per pop, in degrees
 const TURN_DEGREES := 38.0

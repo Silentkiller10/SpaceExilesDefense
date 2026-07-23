@@ -18,6 +18,10 @@ const CYBORG_SCENE := preload("res://scenes/boss_cyborg.tscn")
 const GIANT_STAR_SCENE := preload("res://scenes/boss_star.tscn")
 const EnemyScript := preload("res://scripts/enemy.gd")
 
+## Global difficulty knobs applied to every spawn path.
+const GLOBAL_ENEMY_HP_MULT := 1.7
+const GLOBAL_ENEMY_SPEED_MULT := 0.65
+
 ## --- Threat-budget wave composition ---
 ## Each wave gets a threat budget (grows with wave + stage) and "buys"
 ## enemies from this table until the budget runs out. Weights shift with
@@ -326,7 +330,7 @@ func _stage_hp_mult() -> float:
 		m += float(wave) * 0.06
 	if _is_boss_stage():
 		m *= 1.35
-	return m
+	return m * GLOBAL_ENEMY_HP_MULT
 
 func _stage_speed_mult() -> float:
 	var eff := _effective_stage()
@@ -335,7 +339,7 @@ func _stage_speed_mult() -> float:
 		m += float(wave) * 0.025
 	if _is_boss_stage():
 		m *= 1.10
-	return m
+	return m * GLOBAL_ENEMY_SPEED_MULT
 
 func _meteor_slow_mult() -> float:
 	var slow: float = float(PlayerData.get_equipped_bonuses().get("meteor_slow", 0.0))

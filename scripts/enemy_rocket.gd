@@ -10,10 +10,10 @@ const TEX_PATH := "res://assets/png/towers/rocket_projectile.png"
 const ROCKET_SCALE := 0.07
 const MAX_HITS := 3
 
-const BOOST_SPEED := 300.0
+const BOOST_SPEED := 200.0
 const BOOST_TIME := 0.35
 ## Speed gained every 0.5s of flight after the boost ends.
-const ACCEL_STEP := 24.0
+const ACCEL_STEP := 16.0
 const ACCEL_INTERVAL := 0.5
 const HEAT_COLOR := Color(1.0, 0.25, 0.18)
 
@@ -21,7 +21,7 @@ var fortress: Node2D
 var fort_damage: int = 15
 var is_dying: bool = false
 var hits_left: int = MAX_HITS
-var base_speed: float = 95.0
+var base_speed: float = 65.0
 
 var _time: float = 0.0
 var _accel_timer: float = 0.0

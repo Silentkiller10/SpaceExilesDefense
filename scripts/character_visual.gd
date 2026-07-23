@@ -115,49 +115,15 @@ static func build_equipment_panel(parent: Control) -> Control:
 	parent.add_child(overlay)
 	return overlay
 
-## Side-view walk spritesheet body (weapon baked into frames).
-static func build_sprite_body(parent: Node2D) -> AnimatedSprite2D:
+## Rear-view jetpack soldier (`assets/character.png`) with thruster fire.
+static func build_sprite_body(parent: Node2D) -> PlayerJetpackBody:
 	for c in parent.get_children():
 		if c.name != "Shadow":
 			c.queue_free()
 
-	var anim := AnimatedSprite2D.new()
-	anim.name = "SpriteBody"
-	anim.centered = true
-	anim.z_index = 1
-
-	var tex: Texture2D = load(WALK_SHEET_PATH) as Texture2D
-	var frames := SpriteFrames.new()
-	if tex:
-		var sheet_size := tex.get_size()
-		var frame_w := int(sheet_size.x / WALK_FRAME_COUNT)
-		var frame_h := int(sheet_size.y)
-
-		frames.add_animation("idle")
-		frames.set_animation_speed("idle", 4.0)
-		frames.set_animation_loop("idle", true)
-		var idle_frame := AtlasTexture.new()
-		idle_frame.atlas = tex
-		idle_frame.region = Rect2(0, 0, frame_w, frame_h)
-		frames.add_frame("idle", idle_frame)
-
-		frames.add_animation("walk")
-		frames.set_animation_speed("walk", WALK_FPS)
-		frames.set_animation_loop("walk", true)
-		for i in WALK_FRAME_COUNT:
-			var frame_tex := AtlasTexture.new()
-			frame_tex.atlas = tex
-			frame_tex.region = Rect2(i * frame_w, 0, frame_w, frame_h)
-			frames.add_frame("walk", frame_tex)
-
-		var mesh_scale := SPRITE_TARGET_HEIGHT / float(frame_h)
-		anim.scale = Vector2(mesh_scale, mesh_scale)
-		anim.position = Vector2(-6.0, frame_h * mesh_scale * 0.22)
-
-	anim.sprite_frames = frames
-	anim.animation = "idle"
-	parent.add_child(anim)
-	return anim
+	var body := PlayerJetpackBody.create()
+	parent.add_child(body)
+	return body
 
 ## Character screen — soldier holding rifle.
 static func build_paper_doll(parent: Control) -> void:
