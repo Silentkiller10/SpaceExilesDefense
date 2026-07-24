@@ -20,6 +20,13 @@ static func all_cards() -> Array:
 			"color": Color(1.0, 0.85, 0.2), "type": "stat", "category": "character"},
 		{"id": "projectile", "name": "TWIN LINK", "description": "+1 Projectile",
 			"color": Color(0.3, 1.0, 0.7), "type": "stat", "category": "character"},
+		{"id": "kinetic_push", "name": "KINETIC PUSH", "description": "Bullet knockback Lv+1 (10 / 20 / 30). Max Lv3",
+			"color": Color(0.55, 0.85, 1.0), "type": "stat", "category": "character", "max_stacks": 3},
+		{"id": "explosive_rounds", "name": "EXPLOSIVE ROUNDS", "description": "25% chance bullets explode on hit (75% dmg)",
+			"color": Color(1.0, 0.55, 0.2), "type": "skill", "category": "character", "once": true},
+		{"id": "frag_aoe", "name": "WIDER FRAG", "description": "+30% bullet explosion AoE",
+			"color": Color(1.0, 0.65, 0.3), "type": "skill", "category": "character",
+			"requires": "explosive_rounds"},
 		# --- Tower (global / unlock) ---
 		{"id": "tower_power", "name": "OVERCHARGE", "description": "+25% Tower Damage",
 			"color": Color(0.4, 1.0, 0.85), "type": "stat", "category": "tower"},
@@ -37,10 +44,10 @@ static func all_cards() -> Array:
 			"color": Color(0.85, 0.9, 1.0), "type": "tower", "category": "tower"},
 		{"id": "tower_railgun", "name": "RAILGUN", "description": "Slow fire, huge single-target damage, map range",
 			"color": Color(0.45, 0.85, 1.0), "type": "tower", "category": "tower"},
-		{"id": "tower_flamethrower", "name": "FLAME THROWER", "description": "Short range burn spray",
-			"color": Color(1.0, 0.4, 0.1), "type": "tower", "category": "tower"},
-		{"id": "tower_rocket", "name": "ROCKET LAUNCHER", "description": "4 rockets/sec, explosive AoE",
+		{"id": "tower_rocket", "name": "ROCKET LAUNCHER", "description": "6-rocket salvo, explosive AoE",
 			"color": Color(0.4, 0.75, 1.0), "type": "tower", "category": "tower"},
+		{"id": "tower_tesla", "name": "TESLA", "description": "Chain lightning across nearby enemies",
+			"color": Color(0.45, 0.95, 1.0), "type": "tower", "category": "tower"},
 		# --- Specialist (single tower) ---
 		{"id": "spec_laser_dmg", "name": "LASER FOCUS", "description": "Laser damage +50%",
 			"color": Color(1.0, 0.35, 0.6), "type": "specialist", "category": "specialist",
@@ -69,6 +76,9 @@ static func all_cards() -> Array:
 		{"id": "spec_cannon_range", "name": "CANNON REACH", "description": "Cannon range +30%",
 			"color": Color(1.0, 0.7, 0.35), "type": "specialist", "category": "specialist",
 			"target": "cannon", "effect": "range_mult", "amount": 0.3},
+		{"id": "spec_cannon_aoe", "name": "CANNON BLAST", "description": "Cannon explosion radius +40%",
+			"color": Color(1.0, 0.6, 0.25), "type": "specialist", "category": "specialist",
+			"target": "cannon", "effect": "aoe_mult", "amount": 0.4},
 		{"id": "spec_rail_dmg", "name": "RAIL CHARGE", "description": "Railgun damage +50%",
 			"color": Color(0.45, 0.85, 1.0), "type": "specialist", "category": "specialist",
 			"target": "railgun", "effect": "damage_mult", "amount": 0.5},
@@ -78,15 +88,6 @@ static func all_cards() -> Array:
 		{"id": "spec_rail_rate", "name": "RAIL CAPACITOR", "description": "Railgun fire rate +30%",
 			"color": Color(0.4, 0.8, 1.0), "type": "specialist", "category": "specialist",
 			"target": "railgun", "effect": "fire_rate", "amount": 0.3},
-		{"id": "spec_flame_dmg", "name": "NAPALM", "description": "Flame Thrower damage +50%",
-			"color": Color(1.0, 0.4, 0.1), "type": "specialist", "category": "specialist",
-			"target": "flamethrower", "effect": "damage_mult", "amount": 0.5},
-		{"id": "spec_flame_range", "name": "WIDE BURN", "description": "Flame Thrower range +40%",
-			"color": Color(1.0, 0.5, 0.15), "type": "specialist", "category": "specialist",
-			"target": "flamethrower", "effect": "range_mult", "amount": 0.4},
-		{"id": "spec_flame_rate", "name": "FUEL PUMP", "description": "Flame Thrower fire rate +30%",
-			"color": Color(1.0, 0.45, 0.2), "type": "specialist", "category": "specialist",
-			"target": "flamethrower", "effect": "fire_rate", "amount": 0.3},
 		{"id": "spec_rocket_salvo", "name": "FULL SALVO", "description": "Rocket Launcher +1 rocket, -10% damage",
 			"color": Color(0.45, 0.8, 1.0), "type": "specialist", "category": "specialist",
 			"target": "rocket", "effect": "shots", "amount": 1, "damage_penalty": 0.1},
@@ -102,6 +103,21 @@ static func all_cards() -> Array:
 		{"id": "spec_rocket_rate", "name": "RAPID RELOAD", "description": "Rocket Launcher fire rate +30%",
 			"color": Color(0.6, 0.87, 1.0), "type": "specialist", "category": "specialist",
 			"target": "rocket", "effect": "fire_rate", "amount": 0.3},
+		{"id": "spec_tesla_dmg", "name": "HIGH VOLTAGE", "description": "Tesla damage +50%",
+			"color": Color(0.45, 0.95, 1.0), "type": "specialist", "category": "specialist",
+			"target": "tesla", "effect": "damage_mult", "amount": 0.5},
+		{"id": "spec_tesla_shots", "name": "DOUBLE BOLT", "description": "Tesla shots +1, -10% damage",
+			"color": Color(0.5, 0.98, 1.0), "type": "specialist", "category": "specialist",
+			"target": "tesla", "effect": "shots", "amount": 1, "damage_penalty": 0.1},
+		{"id": "spec_tesla_chain", "name": "ARC JUMP", "description": "Tesla +2 chain jumps",
+			"color": Color(0.55, 1.0, 1.0), "type": "specialist", "category": "specialist",
+			"target": "tesla", "effect": "chain", "amount": 2},
+		{"id": "spec_tesla_falloff", "name": "CONDUCTOR", "description": "Tesla chain keeps +10% damage per jump",
+			"color": Color(0.35, 0.88, 1.0), "type": "specialist", "category": "specialist",
+			"target": "tesla", "effect": "chain_falloff", "amount": 0.1},
+		{"id": "spec_tesla_range", "name": "FIELD EXPAND", "description": "Tesla range +30%",
+			"color": Color(0.4, 0.9, 1.0), "type": "specialist", "category": "specialist",
+			"target": "tesla", "effect": "range_mult", "amount": 0.3},
 	]
 
 static func category_label(category: String) -> String:
@@ -117,20 +133,36 @@ static func category_label(category: String) -> String:
 		_:
 			return category.to_upper()
 
-static func _is_available(card: Dictionary, unlocked_towers: Dictionary) -> bool:
+static func _owned_count(owned_ids: Array, cid: String) -> int:
+	var n := 0
+	for id in owned_ids:
+		if String(id) == cid:
+			n += 1
+	return n
+
+static func _is_available(card: Dictionary, unlocked_towers: Dictionary, owned_ids: Array = []) -> bool:
 	var ctype := String(card.get("type", ""))
+	var cid := String(card.get("id", ""))
+	if bool(card.get("once", false)) and cid in owned_ids:
+		return false
+	var max_stacks := int(card.get("max_stacks", 0))
+	if max_stacks > 0 and _owned_count(owned_ids, cid) >= max_stacks:
+		return false
+	var req := String(card.get("requires", ""))
+	if req != "" and req not in owned_ids:
+		return false
 	if ctype == "tower":
-		var key := String(card["id"]).replace("tower_", "")
+		var key := cid.replace("tower_", "")
 		return not unlocked_towers.get(key, false)
 	if ctype == "specialist" or String(card.get("category", "")) == "specialist":
 		var target := String(card.get("target", ""))
 		return unlocked_towers.get(target, false)
 	return true
 
-static func _pool_for_category(category: String, unlocked_towers: Dictionary) -> Array:
+static func _pool_for_category(category: String, unlocked_towers: Dictionary, owned_ids: Array = []) -> Array:
 	var pool: Array = []
 	for card in all_cards():
-		if not _is_available(card, unlocked_towers):
+		if not _is_available(card, unlocked_towers, owned_ids):
 			continue
 		if category == "any" or String(card.get("category", "")) == category:
 			pool.append(card)
@@ -157,14 +189,14 @@ static func _append_pick(picks: Array, used_ids: Array, card: Dictionary, offer_
 	used_ids.append(String(copy["id"]))
 
 ## Level-up offers: [character, tower, specialist, wild]
-static func pick_three(unlocked_towers: Dictionary, _gear, rng: RandomNumberGenerator) -> Array:
-	return pick_level_up(unlocked_towers, _gear, rng)
+static func pick_three(unlocked_towers: Dictionary, _gear, rng: RandomNumberGenerator, owned_ids: Array = []) -> Array:
+	return pick_level_up(unlocked_towers, _gear, rng, owned_ids)
 
-static func pick_level_up(unlocked_towers: Dictionary, _gear, rng: RandomNumberGenerator) -> Array:
-	var char_pool := _pool_for_category("character", unlocked_towers)
-	var tower_pool := _pool_for_category("tower", unlocked_towers)
-	var spec_pool := _pool_for_category("specialist", unlocked_towers)
-	var any_pool := _pool_for_category("any", unlocked_towers)
+static func pick_level_up(unlocked_towers: Dictionary, _gear, rng: RandomNumberGenerator, owned_ids: Array = []) -> Array:
+	var char_pool := _pool_for_category("character", unlocked_towers, owned_ids)
+	var tower_pool := _pool_for_category("tower", unlocked_towers, owned_ids)
+	var spec_pool := _pool_for_category("specialist", unlocked_towers, owned_ids)
+	var any_pool := _pool_for_category("any", unlocked_towers, owned_ids)
 
 	var picks: Array = []
 	var used_ids: Array = []
@@ -192,9 +224,14 @@ static func pick_level_up(unlocked_towers: Dictionary, _gear, rng: RandomNumberG
 		wild_card = any_pool[rng.randi() % any_pool.size()]
 	_append_pick(picks, used_ids, wild_card, "random")
 
-	var fallback := all_cards()
+	var fallback := _pool_for_category("any", unlocked_towers, owned_ids)
 	while picks.size() < 4 and fallback.size() > 0:
 		var card: Dictionary = fallback[rng.randi() % fallback.size()].duplicate(true)
+		var fid := String(card.get("id", ""))
+		if fid in used_ids:
+			fallback.erase(card)
+			continue
 		card["offer_slot"] = "random"
 		picks.append(card)
+		used_ids.append(fid)
 	return picks

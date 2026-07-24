@@ -37,6 +37,7 @@ var _muzzle_tex: Vector2
 var _recoil: float = 0.0
 var _idle_t: float = 0.0
 var _charge: float = 0.0
+var _aoe_mult: float = 1.0
 
 func _ready() -> void:
 	configure("cannon", "Cannon", CORE, 520.0, 1.1, 120)
@@ -45,6 +46,9 @@ func _ready() -> void:
 func unlock() -> void:
 	super.unlock()
 	V.play_unlock(self)
+
+func apply_aoe_mult(mult_add: float) -> void:
+	_aoe_mult *= (1.0 + mult_add)
 
 func _build_visual() -> void:
 	V.add_shadow(self, SHADOW_RADIUS)
@@ -143,7 +147,7 @@ func _fire(target: Node2D) -> void:
 	if target == null or not is_instance_valid(target):
 		return
 	var impact: Vector2 = target.global_position
-	var blast_r := 180.0
+	var blast_r := 180.0 * _aoe_mult
 	_recoil = 14.0
 	_charge = 1.0
 	_play_shot_sfx()

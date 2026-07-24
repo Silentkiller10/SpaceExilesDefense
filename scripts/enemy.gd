@@ -521,10 +521,12 @@ func _physics_process(delta):
 
 	_fall_time += delta
 
-	# Strict vertical fall — lock X so nothing can push sideways
+	# Strict vertical fall — lock X so nothing can push sideways.
+	# Knockback is an additive upward impulse (not scaled by slow), so hits can
+	# actually shove meteors back up instead of only slightly slowing the fall.
 	var scale := get_move_speed_scale()
-	velocity = Vector2(0.0, (speed + pull_force.y) * scale)
-	pull_force = Vector2(0.0, lerpf(pull_force.y, 0.0, 8.0 * delta))
+	velocity = Vector2(0.0, speed * scale + pull_force.y)
+	pull_force = Vector2(0.0, lerpf(pull_force.y, 0.0, 5.0 * delta))
 	move_and_slide()
 	global_position.x = _spawn_x
 	velocity.x = 0.0
@@ -596,7 +598,7 @@ func take_damage(amount: int, knockback: float = 0.0, apply_ignition: bool = fal
 		health_bar.value = health
 	_show_hit_flash(amount)
 	if knockback > 0.0:
-		pull_force.y -= knockback * 0.35
+		pull_force.y -= knockback
 	if apply_ignition:
 		apply_burn(2.5, 18.0)
 	if health <= 0:
@@ -613,9 +615,9 @@ func get_hit(damage: int, bullet_trans: Transform2D, knockback: float = 0.0, app
 
 	_show_hit_flash(damage)
 
-	# Knockback only slows/pushes vertically — never sideways
+	# Knockback only pushes vertically — never sideways
 	if knockback > 0.0:
-		pull_force.y -= knockback * 0.35
+		pull_force.y -= knockback
 
 	if apply_ignition:
 		apply_burn(2.5, 18.0)

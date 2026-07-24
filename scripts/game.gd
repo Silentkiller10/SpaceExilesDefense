@@ -17,8 +17,8 @@ var unlocked_towers: Dictionary = {
 	"cannon": false,
 	"machinegun": false,
 	"railgun": false,
-	"flamethrower": false,
-	"rocket": false
+	"rocket": false,
+	"tesla": false
 }
 
 var towers: Dictionary = {}
@@ -72,8 +72,8 @@ var tower_scenes := {
 	"cannon": preload("res://scenes/towers/tower_cannon.tscn"),
 	"machinegun": preload("res://scenes/towers/tower_machinegun.tscn"),
 	"railgun": preload("res://scenes/towers/tower_railgun.tscn"),
-	"flamethrower": preload("res://scenes/towers/tower_flamethrower.tscn"),
-	"rocket": preload("res://scenes/towers/tower_rocket.tscn")
+	"rocket": preload("res://scenes/towers/tower_rocket.tscn"),
+	"tesla": preload("res://scenes/towers/tower_tesla.tscn")
 }
 
 func _ready():
@@ -240,7 +240,7 @@ func _setup_ramp_walkway(surface_y: float) -> void:
 		ramp.add_child(pillar)
 
 func _spawn_tower_slots() -> void:
-	var ids := ["laser", "cannon", "machinegun", "railgun", "flamethrower", "rocket"]
+	var ids := ["laser", "cannon", "machinegun", "railgun", "rocket", "tesla"]
 	var spacing := arena_size.x / float(ids.size() + 1)
 	var y := arena_size.y - 55.0
 	for i in ids.size():
@@ -813,7 +813,10 @@ func show_upgrade_cards():
 	subtitle.size = Vector2(arena_size.x - 40, 22)
 	upgrade_ui_container.add_child(subtitle)
 
-	var cards := UpgradeCardsScript.pick_level_up(unlocked_towers, gear, rand)
+	var owned_ids: Array = []
+	for u in run_upgrades:
+		owned_ids.append(String(u.get("id", "")))
+	var cards := UpgradeCardsScript.pick_level_up(unlocked_towers, gear, rand, owned_ids)
 	# Portrait: stack 4 compact cards
 	var card_w: float = mini(300.0, arena_size.x - 48.0)
 	var card_h: float = 132.0
@@ -924,6 +927,12 @@ func apply_card(card: Dictionary) -> void:
 				fortress.health_changed.emit(fortress.health, fortress.max_health)
 		"projectile":
 			player.bonus_projectiles += 1
+		"kinetic_push":
+			player.apply_kinetic_push_level()
+		"explosive_rounds":
+			player.bullet_explode_chance = maxf(player.bullet_explode_chance, 0.25)
+		"frag_aoe":
+			player.bullet_explode_radius *= 1.30
 		"tower_laser":
 			_unlock_tower("laser")
 		"tower_cannon":
@@ -932,10 +941,10 @@ func apply_card(card: Dictionary) -> void:
 			_unlock_tower("machinegun")
 		"tower_railgun":
 			_unlock_tower("railgun")
-		"tower_flamethrower":
-			_unlock_tower("flamethrower")
 		"tower_rocket":
 			_unlock_tower("rocket")
+		"tower_tesla":
+			_unlock_tower("tesla")
 
 func _apply_tower_specialist(card: Dictionary) -> void:
 	var target_id := String(card.get("target", ""))
@@ -968,6 +977,12 @@ func _apply_tower_specialist(card: Dictionary) -> void:
 		"aoe_mult":
 			if tower.has_method("apply_aoe_mult"):
 				tower.apply_aoe_mult(amount)
+		"chain":
+			if tower.has_method("apply_chain_bonus"):
+				tower.apply_chain_bonus(int(amount))
+		"chain_falloff":
+			if tower.has_method("apply_chain_falloff_bonus"):
+				tower.apply_chain_falloff_bonus(amount)
 
 func _buff_all_tower_range(mult_add: float) -> void:
 	for id in towers.keys():

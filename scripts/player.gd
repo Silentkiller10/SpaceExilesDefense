@@ -10,6 +10,14 @@ extends CharacterBody2D
 @export var pierce_count: int = 0
 @export var bonus_projectiles: int = 0
 @export var knockback_strength: float = 0.0
+## KINETIC PUSH stacks (0–3). Values are upward impulse (px/s).
+const KINETIC_BASE := 10.0
+const KINETIC_LEVEL_BONUS := [0.0, 1.0, 2.0]
+var kinetic_level: int = 0
+## Chance (0–1) that a bullet explodes on hit.
+var bullet_explode_chance: float = 0.0
+## Splash radius in pixels for bullet explosions.
+var bullet_explode_radius: float = 70.0
 
 # Gear bonuses (applied from GearSystem)
 var gear_damage_bonus: float = 0.0
@@ -138,6 +146,11 @@ func apply_fire_rate_card(mult: float = 0.70) -> void:
 	base_fire_interval = max(0.08, base_fire_interval * mult)
 	shot_timer.wait_time = base_fire_interval
 
+func apply_kinetic_push_level() -> void:
+	kinetic_level = mini(3, kinetic_level + 1)
+	var bonus: float = KINETIC_LEVEL_BONUS[kinetic_level - 1]
+	knockback_strength = KINETIC_BASE * (1.0 + bonus)
+
 func _find_closest_enemy() -> Node2D:
 	var best: Node2D = null
 	var best_dist: float = INF
@@ -222,6 +235,8 @@ func shoot():
 		bullet.knockback = knockback_strength
 		bullet.apply_ignition = gear_ignition
 		bullet.fork_count = gear_fork_count + bonus_fork
+		bullet.explode_chance = bullet_explode_chance
+		bullet.explode_radius = bullet_explode_radius
 		var angle_offset = start_angle + (i * spread_angle)
 		var spawn_trans = bullet_spawn_pos.global_transform.rotated_local(angle_offset)
 		bullet.setup(spawn_trans)
