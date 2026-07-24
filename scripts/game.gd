@@ -89,11 +89,10 @@ func _ready():
 	fortress.health_changed.connect(_on_fortress_health_changed)
 	fortress.fortress_destroyed.connect(_on_fortress_destroyed)
 
-	# Player fights from an elevated ramp walkway above the tower row
-	var rampart_y := arena_size.y - 300.0
-	_setup_ramp_walkway(rampart_y + 20.0)
-	player.set_arena(arena_size.x, rampart_y)
-	player.setup(Vector2(arena_size.x * 0.5, rampart_y))
+	# Player fights in the open field above the tower row
+	var start_y := arena_size.y - 300.0
+	player.set_arena(arena_size.x, arena_size.y)
+	player.setup(Vector2(arena_size.x * 0.5, start_y))
 
 	camera.position = arena_size * 0.5
 	camera.make_current()
@@ -180,67 +179,9 @@ func _setup_arena_visuals() -> void:
 		])
 		city.color = Color(0.02, 0.03, 0.05, 0.85)
 
-func _setup_ramp_walkway(surface_y: float) -> void:
-	var ramp := Node2D.new()
-	ramp.name = "RampWalkway"
-	ramp.z_index = -10
-	add_child(ramp)
-
-	var w := arena_size.x
-	var deck_h := 24.0
-	var margin := 16.0
-	var ground_y := arena_size.y - 80.0
-
-	var deck := Polygon2D.new()
-	deck.polygon = PackedVector2Array([
-		Vector2(margin, surface_y),
-		Vector2(w - margin, surface_y),
-		Vector2(w - margin, surface_y + deck_h),
-		Vector2(margin, surface_y + deck_h)
-	])
-	deck.color = Color(0.12, 0.18, 0.28, 1.0)
-	ramp.add_child(deck)
-
-	# Glowing walk-surface edge
-	var edge := Polygon2D.new()
-	edge.polygon = PackedVector2Array([
-		Vector2(margin, surface_y),
-		Vector2(w - margin, surface_y),
-		Vector2(w - margin, surface_y + 4.0),
-		Vector2(margin, surface_y + 4.0)
-	])
-	edge.color = Color(0.25, 0.75, 0.95, 0.9)
-	ramp.add_child(edge)
-
-	# Angled ramp ends connecting the walkway down to the fortress roof
-	for side: float in [-1.0, 1.0]:
-		var edge_x := margin if side < 0.0 else w - margin
-		var foot_x := edge_x + side * 90.0
-		var side_ramp := Polygon2D.new()
-		side_ramp.polygon = PackedVector2Array([
-			Vector2(edge_x, surface_y),
-			Vector2(edge_x, surface_y + deck_h),
-			Vector2(clampf(foot_x, 0.0, w), ground_y)
-		])
-		side_ramp.color = Color(0.1, 0.15, 0.24, 1.0)
-		ramp.add_child(side_ramp)
-
-	# Support pillars down to the fortress roofline
-	var pillar_count := 5
-	for i in pillar_count:
-		var x := lerpf(margin + 50.0, w - margin - 50.0, float(i) / float(pillar_count - 1))
-		var pillar := Polygon2D.new()
-		pillar.polygon = PackedVector2Array([
-			Vector2(x - 7.0, surface_y + deck_h),
-			Vector2(x + 7.0, surface_y + deck_h),
-			Vector2(x + 7.0, ground_y),
-			Vector2(x - 7.0, ground_y)
-		])
-		pillar.color = Color(0.08, 0.12, 0.2, 1.0)
-		ramp.add_child(pillar)
-
 func _spawn_tower_slots() -> void:
-	var ids := ["laser", "cannon", "machinegun", "railgun", "rocket", "tesla"]
+	# Laser far left, Machine Gun far right
+	var ids := ["laser", "cannon", "railgun", "rocket", "tesla", "machinegun"]
 	var spacing := arena_size.x / float(ids.size() + 1)
 	var y := arena_size.y - 55.0
 	for i in ids.size():

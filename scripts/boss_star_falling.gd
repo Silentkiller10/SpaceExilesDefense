@@ -7,9 +7,9 @@ const TEX_PATH := "res://assets/png/bosses/falling_star.png"
 
 ## size_key -> visual + combat profile
 const SIZE_PROFILES := {
-	"small": {"scale": 0.18, "hits": 1, "damage": 10, "speed": 260.0, "collision": Vector2(10, 28)},
-	"medium": {"scale": 0.28, "hits": 2, "damage": 18, "speed": 200.0, "collision": Vector2(14, 40)},
-	"large": {"scale": 0.42, "hits": 3, "damage": 28, "speed": 150.0, "collision": Vector2(20, 56)},
+	"small": {"scale": 0.18, "hits": 1, "damage": 10, "speed": 260.0, "collision": Vector2(28, 40)},
+	"medium": {"scale": 0.28, "hits": 2, "damage": 18, "speed": 200.0, "collision": Vector2(40, 56)},
+	"large": {"scale": 0.42, "hits": 3, "damage": 28, "speed": 150.0, "collision": Vector2(56, 72)},
 }
 
 var fortress: Node2D
@@ -102,15 +102,23 @@ func _stasis_scale() -> float:
 			scale = minf(scale, float(z.get_slow_for(global_position)))
 	return scale
 
-func take_damage(_amount: int, _knockback: float = 0.0, _apply_ignition: bool = false) -> void:
+func take_damage(amount: int = 1, _knockback: float = 0.0, _apply_ignition: bool = false) -> void:
 	if is_dying:
 		return
-	hits_left -= 1
+	# Player/tower shots are strong — one solid hit usually chips a "hit".
+	var chips := 1
+	if amount >= 40:
+		chips = 1
+	hits_left = maxi(0, hits_left - chips)
 	_flash_t = 0.08
 	if _hp_bar:
 		_hp_bar.value = hits_left
 	if hits_left <= 0:
 		_die()
+
+## Player bullets call get_hit (not take_damage).
+func get_hit(damage: int, _bullet_trans: Transform2D, knockback: float = 0.0, apply_ignition: bool = false) -> void:
+	take_damage(damage, knockback, apply_ignition)
 
 func _impact_fortress() -> void:
 	if is_dying:

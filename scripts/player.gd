@@ -40,6 +40,11 @@ var is_shot_cd: bool = false
 var invincible: bool = false
 var lr: bool = true
 var arena_width: float = 1152.0
+var arena_height: float = 1280.0
+## Vertical play band (above towers, below HUD).
+var move_min_y: float = 200.0
+var move_max_y: float = 980.0
+## Kept for callers that still read the old locked rail Y.
 var rampart_y: float = 560.0
 ## Sandbox: no auto-aim/auto-fire — only shoots while click/hold on "shot"
 var manual_fire_only: bool = false
@@ -83,9 +88,13 @@ func setup(pos: Vector2):
 	rampart_y = pos.y
 	show()
 
-func set_arena(width: float, y: float) -> void:
+func set_arena(width: float, height: float) -> void:
 	arena_width = width
-	rampart_y = y
+	arena_height = height
+	# Match the open field above the tower row (towers sit near height - 55).
+	move_min_y = 180.0
+	move_max_y = height - 140.0
+	rampart_y = clampf(rampart_y, move_min_y, move_max_y)
 
 func apply_stun(duration: float) -> void:
 	stun_timer = maxf(stun_timer, duration)
@@ -106,16 +115,19 @@ func _physics_process(delta):
 		velocity.x += 1
 	if Input.is_action_pressed("move_left"):
 		velocity.x -= 1
+	if Input.is_action_pressed("move_up"):
+		velocity.y -= 1
+	if Input.is_action_pressed("move_down"):
+		velocity.y += 1
 
-	var is_moving := absf(velocity.x) > 0.0
 	var target: Node2D = _find_closest_enemy()
 	var has_enemy := target != null
 
-	# Moving → shoot straight up; idle → auto-aim at closest enemy.
-	if is_moving or not has_enemy:
-		_aim_straight_up()
-	else:
+	# Full 360° aim — at the nearest enemy, or mouse if none.
+	if has_enemy:
 		_aim_at(target.global_position)
+	else:
+		_aim_at(get_global_mouse_position())
 
 	# Only fire when an enemy exists (sandbox still requires click/hold).
 	if has_enemy and not is_shot_cd:
@@ -125,15 +137,17 @@ func _physics_process(delta):
 		else:
 			_try_shoot()
 
-	if absf(velocity.x) > 0.0:
+	if velocity.length() > 0.0:
 		velocity = velocity.normalized() * (speed * move_speed_modifier * (1.0 + gear_move_bonus))
 		move_trail_effect.emitting = true
+	else:
+		move_trail_effect.emitting = false
 
 	update_body_lr()
 	move_and_slide()
 
-	position.y = rampart_y
-	position.x = clamp(position.x, 40.0, arena_width - 40.0)
+	position.x = clampf(position.x, 40.0, arena_width - 40.0)
+	position.y = clampf(position.y, move_min_y, move_max_y)
 
 func _try_shoot() -> void:
 	shoot()
@@ -170,29 +184,15 @@ func _aim_at(world_pos: Vector2) -> void:
 		return
 	var aim: Vector2 = world_pos - global_position
 	if aim.length() < 1.0:
-		aim = Vector2.UP
-	# Full 180° — anywhere above the horizon; below it, snap to nearest side
-	body_rotate.rotation = _clamp_to_upper_half(aim.angle())
-
-func _aim_straight_up() -> void:
-	if not rotate_flag:
 		return
-	body_rotate.rotation = Vector2.UP.angle()
-
-## Limits an aim angle to the upper half-circle (180°). Angles pointing
-## below the horizon snap to the nearest horizontal side, avoiding the
-## atan2 wrap that would flip a below-left aim over to the right.
-func _clamp_to_upper_half(angle: float) -> float:
-	if angle > 0.0:
-		return 0.0 if angle <= PI / 2.0 else -PI
-	return angle
+	body_rotate.rotation = aim.angle()
 
 func update_body_lr():
 	if not lr_flag:
 		return
 	var base_scale: float = CharacterVisualScript.COMBAT_SCALE
 	var facing_right: bool
-	if abs(velocity.x) > 0:
+	if absf(velocity.x) > 0.05:
 		facing_right = velocity.x > 0
 		if velocity.x > 0:
 			body_lr_collider.scale.x = -1
@@ -201,7 +201,9 @@ func update_body_lr():
 			body_lr_collider.scale.x = 1
 			lr = false
 	else:
-		facing_right = lr
+		# Face toward aim direction when mostly moving vertically / idle.
+		facing_right = cos(body_rotate.rotation) >= 0.0
+		lr = facing_right
 
 	# Spritesheet art faces right; flip_h when moving/facing left.
 	body_lr.scale = Vector2(base_scale, base_scale)
@@ -211,7 +213,7 @@ func update_body_lr():
 
 	_body_anim.flip_h = not facing_right
 
-	if abs(velocity.x) > 0:
+	if velocity.length() > 0.05:
 		_body_anim.speed_scale = 1.0
 		if _body_anim.animation != "walk":
 			_body_anim.play("walk")

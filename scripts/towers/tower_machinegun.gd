@@ -31,7 +31,7 @@ var _recoil: float = 0.0
 var _idle_t: float = 0.0
 
 func _ready() -> void:
-	configure("machinegun", "Machine Gun", Color(0.85, 0.9, 1.0), 500.0, 0.05, 16)
+	configure("machinegun", "Machine Gun", Color(0.85, 0.9, 1.0), 750.0, 0.05, 16)
 	super._ready()
 
 func unlock() -> void:

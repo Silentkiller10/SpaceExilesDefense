@@ -155,7 +155,7 @@ func _update_head_fx(pulse: float) -> void:
 func _fire(target: Node2D) -> void:
 	if target == null or not is_instance_valid(target):
 		return
-	_hit_enemy(target, _scaled_damage(), 40.0)
+	_hit_enemy(target, _scaled_damage(), 0.0)
 	_charge = 0.0
 	_recoil = 18.0
 	_play_shot_sfx()

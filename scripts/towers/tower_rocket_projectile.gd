@@ -127,7 +127,7 @@ func _explode() -> void:
 		if global_position.distance_to(enemy.global_position) > blast_radius:
 			continue
 		if enemy.has_method("take_damage"):
-			enemy.take_damage(damage, 80.0)
+			enemy.take_damage(damage, 0.0)
 		elif enemy.has_method("get_hit"):
 			enemy.get_hit(damage, global_transform, 80.0)
 	_spawn_blast_fx()

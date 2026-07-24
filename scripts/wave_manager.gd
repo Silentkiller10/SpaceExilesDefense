@@ -31,15 +31,24 @@ const GLOBAL_ENEMY_SPEED_MULT := 0.65
 ##   base_w       — spawn weight at stage 1
 ##   w_per_stage  — weight change per stage past the first (can be negative)
 ##   min_w        — weight floor so cheap types never fully vanish
+##   min_stage    — earliest campaign stage this type may appear
 ##   min_wave     — earliest wave this type may appear
 ##   max_per_wave — hard cap per wave (0 = unlimited)
+##
+## Stage unlocks (normal campaign):
+##   1 — Small / Meteor / Heavy Meteor
+##   2 — + UFO
+##   3 — + Rocketeer
+##   4 — + Kamikaze
+##   5 — + Carrier
 const SPAWN_TABLE := [
-	{"id": "small", "kind": "creep", "cost": 1, "base_w": 1.30, "w_per_stage": -0.12, "min_w": 0.15, "min_wave": 1, "max_per_wave": 0},
-	{"id": "normal", "kind": "creep", "cost": 2, "base_w": 1.10, "w_per_stage": -0.08, "min_w": 0.15, "min_wave": 1, "max_per_wave": 0},
-	{"id": "ufo", "kind": "creep", "cost": 3, "base_w": 0.70, "w_per_stage": 0.08, "min_w": 0.0, "min_wave": 1, "max_per_wave": 0},
-	{"id": "heavy", "kind": "creep", "cost": 4, "base_w": 0.60, "w_per_stage": 0.10, "min_w": 0.0, "min_wave": 2, "max_per_wave": 0},
-	{"id": "rocketeer", "kind": "rocketeer", "cost": 8, "base_w": 0.15, "w_per_stage": 0.12, "min_w": 0.0, "min_wave": 3, "max_per_wave": 3},
-	{"id": "kamikaze", "kind": "kamikaze", "cost": 6, "base_w": 0.10, "w_per_stage": 0.10, "min_w": 0.0, "min_wave": 4, "max_per_wave": 2},
+	{"id": "small", "kind": "creep", "cost": 1, "base_w": 1.30, "w_per_stage": -0.12, "min_w": 0.15, "min_stage": 1, "min_wave": 1, "max_per_wave": 0},
+	{"id": "normal", "kind": "creep", "cost": 2, "base_w": 1.10, "w_per_stage": -0.08, "min_w": 0.15, "min_stage": 1, "min_wave": 1, "max_per_wave": 0},
+	{"id": "heavy", "kind": "creep", "cost": 4, "base_w": 0.60, "w_per_stage": 0.10, "min_w": 0.0, "min_stage": 1, "min_wave": 1, "max_per_wave": 0},
+	{"id": "ufo", "kind": "creep", "cost": 3, "base_w": 0.22, "w_per_stage": 0.03, "min_w": 0.0, "min_stage": 2, "min_wave": 1, "max_per_wave": 2},
+	{"id": "rocketeer", "kind": "rocketeer", "cost": 8, "base_w": 0.15, "w_per_stage": 0.12, "min_w": 0.0, "min_stage": 3, "min_wave": 1, "max_per_wave": 3},
+	{"id": "kamikaze", "kind": "kamikaze", "cost": 6, "base_w": 0.10, "w_per_stage": 0.10, "min_w": 0.0, "min_stage": 4, "min_wave": 1, "max_per_wave": 2},
+	{"id": "carrier", "kind": "carrier", "cost": 12, "base_w": 0.08, "w_per_stage": 0.10, "min_w": 0.0, "min_stage": 5, "min_wave": 1, "max_per_wave": 1},
 ]
 
 ## --- Chunked spawn pipeline ---
@@ -215,11 +224,17 @@ func _buy_wave_jobs(budget: int) -> Array:
 		for entry in SPAWN_TABLE:
 			if int(entry["cost"]) > budget:
 				continue
+			if _effective_stage() < int(entry.get("min_stage", 1)):
+				continue
 			if wave < int(entry["min_wave"]):
 				continue
 			var cap := int(entry["max_per_wave"])
 			if cap > 0 and int(counts.get(entry["id"], 0)) >= cap:
 				continue
+			# Hard cap: at most 2 UFOs alive / queued at once
+			if String(entry["id"]) == "ufo":
+				if _live_ufo_count() + _pending_ufo_count() + int(counts.get("ufo", 0)) >= 2:
+					continue
 			var w := _entry_weight(entry)
 			if w <= 0.0:
 				continue
@@ -349,6 +364,11 @@ func _finalize_creep(enemy: Node, etype_in) -> void:
 	var etype: Dictionary = etype_in if etype_in is Dictionary else {}
 	if etype.is_empty():
 		etype = EnemyScript.pick_enemy_type(rng)
+	# Drop excess UFO spawns if two are already on the field
+	if String(etype.get("id", "")) == "ufo" and _live_ufo_count() >= 2:
+		if is_instance_valid(enemy):
+			enemy.queue_free()
+		return
 	var x := rng.randf_range(60.0, arena_width - 60.0)
 	var y := spawn_y + rng.randf_range(-20.0, 40.0)
 	var hp: int
@@ -367,6 +387,23 @@ func _finalize_creep(enemy: Node, etype_in) -> void:
 	enemy.connect("enemy_destroyed", _on_enemy_destroyed)
 	active_enemies.append(enemy)
 	creep_spawned.emit(enemy)
+
+func _live_ufo_count() -> int:
+	var n := 0
+	for e in active_enemies:
+		if is_instance_valid(e) and e.get("type_id") == "ufo" and e.get("is_dying") != true:
+			n += 1
+	return n
+
+func _pending_ufo_count() -> int:
+	var n := 0
+	for job in _spawn_queue:
+		if String(job.get("kind", "")) != "creep":
+			continue
+		var et = job.get("etype", {})
+		if et is Dictionary and String(et.get("id", "")) == "ufo":
+			n += 1
+	return n
 
 func _finalize_rocketeer(ship: Node) -> void:
 	var x := rng.randf_range(90.0, arena_width - 90.0)
@@ -454,7 +491,7 @@ func _finalize_cyborg(boss: Node) -> void:
 
 ## Giant Star — post-stage-10 end boss. Huge HP, slow drift, rains falling stars.
 func _finalize_giant_star(boss: Node) -> void:
-	var hp := int((90000.0 + float(wave) * 5200.0 + float(maxi(0, stage - 10)) * 8000.0) * _stage_hp_mult())
+	var hp := int((45000.0 + float(wave) * 2600.0 + float(maxi(0, stage - 10)) * 4000.0) * _stage_hp_mult())
 	# Enter from above the arena so it drifts in instead of popping on-screen
 	var spd := 28.0 * _stage_speed_mult()
 	get_tree().current_scene.add_child(boss)

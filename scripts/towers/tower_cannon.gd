@@ -40,7 +40,7 @@ var _charge: float = 0.0
 var _aoe_mult: float = 1.0
 
 func _ready() -> void:
-	configure("cannon", "Cannon", CORE, 520.0, 1.1, 120)
+	configure("cannon", "Cannon", CORE, 780.0, 1.1, 120)
 	super._ready()
 
 func unlock() -> void:

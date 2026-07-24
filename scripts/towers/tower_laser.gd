@@ -48,7 +48,7 @@ var _sfx_cd: float = 0.0
 const SFX_INTERVAL := 0.12
 
 func _ready() -> void:
-	configure("laser", "Laser", CORE, 560.0, 0.04, 18)
+	configure("laser", "Laser", CORE, 840.0, 0.04, 18)
 	super._ready()
 
 func unlock() -> void:
